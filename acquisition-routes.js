@@ -39,6 +39,12 @@ function linkAudit(visitorId,auditId){
   const record={auditId,visitorId,firstTouch:visitor.firstTouch,lastTouch:visitor.lastTouch,linkedAt:new Date().toISOString()};
   if(current)store.update('auditAttributions',current.id,record);else store.insert('auditAttributions',record);
   store.update('acquisitionVisitors',visitor.id,{auditId});
+  const db=store.read();
+  for(const lead of (db.acquisitionLeads||[]).filter(l=>l.visitorId===visitorId&&l.status!=='Converted to audit')){
+    store.update('acquisitionLeads',lead.id,{status:'Converted to audit',auditId,convertedAt:new Date().toISOString()});
+    const task=(store.read().followUps||[]).find(t=>t.key===`acquisition-lead:${lead.id}`);
+    if(task&&['Open','Snoozed'].includes(task.status))store.update('followUps',task.id,{status:'Resolved',resolvedAt:new Date().toISOString(),resolution:'Campaign lead converted to a Business Readiness Audit.'});
+  }
   return record;
 }
 function completed(p){return String(p?.status||'').toUpperCase()==='COMPLETE';}
@@ -69,7 +75,9 @@ module.exports=function registerAcquisitionRoutes(app){
   });
   app.post('/api/acquisition/lead',(req,res)=>{
     const name=clean(req.body.name),phone=clean(req.body.phone),businessName=clean(req.body.businessName),goal=normalise(req.body.goal).slice(0,1200),visitorId=clean(req.body.visitorId);if(!name||!phone)return res.status(400).json({error:'Name and mobile number are required.'});
-    const touch=touchFrom(req.body.touch||req.body);const lead=store.insert('acquisitionLeads',{visitorId,name,phone,businessName,goal,touch,status:'New',source:'Campaign lead capture'});if(visitorId)track(visitorId,'lead_capture',touch,{label:businessName||name});res.status(201).json({lead:{id:lead.id,name:lead.name,businessName:lead.businessName}});
+    const touch=touchFrom(req.body.touch||req.body);const lead=store.insert('acquisitionLeads',{visitorId,name,phone,businessName,goal,touch,status:'New',source:'Campaign lead capture'});
+    store.insert('followUps',{key:`acquisition-lead:${lead.id}`,type:'campaign-lead',status:'Open',priority:'high',dueAt:new Date().toISOString(),title:'Fresh campaign / WhatsApp lead',message:`${businessName||name} submitted a campaign enquiry from ${touch.source} / ${touch.campaign}.`,name,businessName,email:'',phone,recommendedAction:'Contact the lead while intent is fresh and move them toward a Chancellor conversation or R500 audit.',acquisitionLeadId:lead.id});
+    if(visitorId)track(visitorId,'lead_capture',touch,{label:businessName||name});res.status(201).json({lead:{id:lead.id,name:lead.name,businessName:lead.businessName}});
   });
   app.post('/api/acquisition/link-audit',requireClient,(req,res)=>{
     const visitorId=clean(req.body.visitorId),auditId=req.session.clientId;const linked=linkAudit(visitorId,auditId);if(!linked)return res.status(404).json({error:'Acquisition visitor could not be linked.'});
