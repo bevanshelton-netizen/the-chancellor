@@ -1,0 +1,8 @@
+node_modules
+.env
+data/desk.json
+data/uploads/*
+data/sessions/*
+.git
+*.log
+tests
