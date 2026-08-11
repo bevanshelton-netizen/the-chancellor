@@ -51,3 +51,4 @@ const ceoObserver=new MutationObserver(()=>loadExecutive());
 const ceoDash=document.querySelector('#adminDash');if(ceoDash)ceoObserver.observe(ceoDash,{attributes:true,attributeFilter:['class']});
 document.querySelectorAll('.command-tabs button').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.tab==='executiveView')loadExecutive();}));
 setTimeout(loadExecutive,700);
+if(!document.querySelector('script[data-offer-desk]')){const s=document.createElement('script');s.src='offers-admin.js?v=20260811-1';s.dataset.offerDesk='1';document.body.appendChild(s)}
