@@ -37,6 +37,7 @@ const requireAdmin = (req, res, next) => req.session.admin ? next() : res.status
 const allowed = (process.env.ALLOWED_UPLOAD_TYPES || 'application/pdf,image/jpeg,image/png').split(',');
 const uploadsDir = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'uploads'); fs.mkdirSync(uploadsDir, { recursive: true });
 const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, filename: (_, file, cb) => cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${path.extname(file.originalname).toLowerCase()}`) }), limits: { fileSize: Number(process.env.MAX_UPLOAD_MB || 10) * 1024 * 1024, files: 5 }, fileFilter: (_, file, cb) => cb(null, allowed.includes(file.mimetype)) });
+require('./rescue-routes')(app, { store, normalise, hashSecret, verifySecret, accessCode });
 
 app.get('/api/health', (_, res) => res.json({ ok: true, service: "The Chancellor's Business Growth Desk" }));
 app.get('/api/status', (_, res) => res.json({ liveAI: Boolean(process.env.OPENAI_API_KEY), voice: Boolean(process.env.OPENAI_API_KEY) }));
