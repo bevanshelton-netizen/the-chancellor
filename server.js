@@ -29,6 +29,31 @@ const sessionDir = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'
 fs.mkdirSync(sessionDir, { recursive: true });
 app.use(session({ store: new FileStore({ path: sessionDir, retries: 1, ttl: 8 * 60 * 60 }), name: 'growthdesk.sid', secret: sessionSecret, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: isProd, sameSite: 'lax', maxAge: 8 * 60 * 60 * 1000 } }));
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 80, standardHeaders: true, legacyHeaders: false }));
+
+function embeddedBrandImage(svgFile) {
+  const svg = fs.readFileSync(path.join(__dirname, 'assets', svgFile), 'utf8');
+  const match = svg.match(/data:image\/(webp|jpeg|jpg|png);base64,([^"']+)/i);
+  if (!match) throw new Error(`No embedded image found in ${svgFile}`);
+  const type = match[1].toLowerCase() === 'jpg' ? 'jpeg' : match[1].toLowerCase();
+  return { mime: `image/${type}`, buffer: Buffer.from(match[2], 'base64') };
+}
+
+try {
+  const portraitImage = embeddedBrandImage('the-chancellor-approved.svg');
+  const crestImage = embeddedBrandImage('the-chancellor-crest.svg');
+  const sendBrandImage = image => (_req, res) => {
+    res.setHeader('Content-Type', image.mime);
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    res.setHeader('Content-Length', String(image.buffer.length));
+    res.send(image.buffer);
+  };
+  app.get('/brand/chancellor.webp', sendBrandImage(portraitImage));
+  app.get('/brand/crest.jpg', sendBrandImage(crestImage));
+  app.get('/brand/health', (_req, res) => res.json({ ok: true, portraitBytes: portraitImage.buffer.length, crestBytes: crestImage.buffer.length }));
+} catch (error) {
+  console.error('Brand image route setup failed:', error.message);
+}
+
 app.use('/assets', express.static(__dirname, { dotfiles: 'deny' }));
 app.use(express.static(__dirname, { extensions: ['html'], dotfiles: 'deny' }));
 
