@@ -21,4 +21,5 @@ function augment(card){
 }
 function scan(){qa('.production-card').forEach(augment)}
 const target=q('#productionList');if(target)new MutationObserver(scan).observe(target,{childList:true,subtree:true});setInterval(scan,1800);scan();
+if(!document.querySelector('script[data-followup-desk]')){const s=document.createElement('script');s.src='followup-admin.js?v=20260811-1';s.dataset.followupDesk='1';document.body.appendChild(s)}
 })();
