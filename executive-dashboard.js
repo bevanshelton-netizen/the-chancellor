@@ -6,10 +6,10 @@ async function loadExecutive(){
   if(ceoLoading||!document.querySelector('#adminDash')||document.querySelector('#adminDash').classList.contains('hidden'))return;
   ceoLoading=true;
   try{
-    const [growthR,rescueR,membershipR,offersR]=await Promise.all([fetch('/api/admin'),fetch('/api/admin/rescue'),fetch('/api/admin/membership'),fetch('/api/admin/offers')]);
+    const [growthR,rescueR,membershipR,offersR,deliveryR]=await Promise.all([fetch('/api/admin'),fetch('/api/admin/rescue'),fetch('/api/admin/membership'),fetch('/api/admin/offers'),fetch('/api/admin/assignments')]);
     if(!growthR.ok||!rescueR.ok||!membershipR.ok)return;
-    const growth=await growthR.json(),rescue=await rescueR.json(),membership=await membershipR.json(),offers=offersR.ok?await offersR.json():{offers:[],payments:[]};
-    const cases=rescue.rescueCases||[],pros=rescue.professionals||[],payments=membership.payments||[],gm=growth.metrics||{},mm=membership.metrics||{};
+    const growth=await growthR.json(),rescue=await rescueR.json(),membership=await membershipR.json(),offers=offersR.ok?await offersR.json():{offers:[],payments:[]},delivery=deliveryR.ok?await deliveryR.json():{metrics:{},assignments:[]};
+    const cases=rescue.rescueCases||[],pros=rescue.professionals||[],payments=membership.payments||[],gm=growth.metrics||{},mm=membership.metrics||{},dm=delivery.metrics||{};
     const completeMembershipPayments=payments.filter(p=>String(p.status||'').toUpperCase()==='COMPLETE');
     const membershipCollected=completeMembershipPayments.reduce((s,p)=>s+Number(p.amount||0),0);
     const growthCollected=Number(gm.revenue||0);
@@ -42,6 +42,8 @@ async function loadExecutive(){
     const outstandingOffers=(offers.offers||[]).filter(o=>!['Paid','Declined','Expired'].includes(o.status)).length;
     const attention=[
       ['Critical cases without a professional',unassignedCritical,unassignedCritical?'Immediate action':'Clear'],
+      ['Paid Growth Desk assignments open',Number(dm.open||0),dm.open?'Delivery queue':'Clear'],
+      ['Growth Desk assignments overdue',Number(dm.overdue||0),dm.overdue?'Immediate action':'Clear'],
       ['Growth offers awaiting payment',outstandingOffers,outstandingOffers?'Follow up':'Clear'],
       ['Professional applications awaiting verification',pendingVetting,pendingVetting?'Review queue':'Clear'],
       ['Membership payments pending',pendingPayments,pendingPayments?'Follow up':'Clear'],
@@ -56,3 +58,4 @@ const ceoDash=document.querySelector('#adminDash');if(ceoDash)ceoObserver.observ
 document.querySelectorAll('.command-tabs button').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.tab==='executiveView')loadExecutive();}));
 setTimeout(loadExecutive,700);
 if(!document.querySelector('script[data-offer-desk]')){const s=document.createElement('script');s.src='offers-admin.js?v=20260811-2';s.dataset.offerDesk='1';document.body.appendChild(s)}
+if(!document.querySelector('script[data-delivery-desk]')){const s=document.createElement('script');s.src='delivery-admin.js?v=20260811-1';s.dataset.deliveryDesk='1';document.body.appendChild(s)}
