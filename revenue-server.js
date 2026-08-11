@@ -3,9 +3,11 @@ const app = require('./server');
 require('./offer-routes')(app);
 require('./delivery-routes')(app);
 require('./production-routes')(app);
+require('./intelligence-routes')(app);
+require('./export-routes')(app);
 
 const port = Number(process.env.PORT || 3000);
-const server = app.listen(port, () => console.log(`Growth Desk revenue, delivery and production server ready at http://localhost:${port}`));
+const server = app.listen(port, () => console.log(`Growth Desk revenue, delivery, production and document intelligence server ready at http://localhost:${port}`));
 
 function close(signal){
   console.log(`${signal} received; closing cleanly.`);
