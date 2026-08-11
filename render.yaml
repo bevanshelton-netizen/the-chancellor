@@ -44,3 +44,5 @@ services:
         sync: false
       - key: MAX_UPLOAD_MB
         value: 10
+      - key: ALLOWED_UPLOAD_TYPES
+        value: application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
