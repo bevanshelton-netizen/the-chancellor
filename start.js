@@ -2,6 +2,7 @@ const app = require('./server');
 require('./membership-routes')(app);
 require('./firm-routes')(app);
 require('./case-room-routes')(app);
+require('./case-billing-routes')(app);
 
 const port = Number(process.env.PORT || 3000);
 
