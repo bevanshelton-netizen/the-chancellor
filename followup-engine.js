@@ -8,7 +8,6 @@ function ageMs(value){const t=new Date(value||0).getTime();return Number.isFinit
 function isComplete(p){return String(p?.status||'').toUpperCase()==='COMPLETE';}
 function dueNow(item){return !item.dueAt||new Date(item.dueAt).getTime()<=Date.now();}
 function phoneDigits(value=''){let d=String(value).replace(/\D/g,'');if(d.startsWith('0'))d=`27${d.slice(1)}`;return d;}
-function publicAudit(a={}){return {id:a.id,name:a.name,businessName:a.businessName,email:a.email,phone:a.phone,status:a.status,salesStage:a.salesStage,goal:a.goal,score:a.score,band:a.band};}
 
 function ensureFollowUp(record){
   const db=store.read();
@@ -22,9 +21,18 @@ function ensureClientNotice(record){
   if(existing)return existing;
   return store.insert('clientNotices',{read:false,...record});
 }
-function auditContact(a){return {auditId:a.id,name:a.name,businessName:a.businessName,email:a.email,phone:a.phone};}
+function auditContact(a={}){return {auditId:a.id,name:a.name,businessName:a.businessName,email:a.email,phone:a.phone};}
+function reopenExpiredSnoozes(){
+  const db=store.read();
+  for(const task of db.followUps||[]){
+    if(task.status==='Snoozed'&&task.snoozedUntil&&new Date(task.snoozedUntil).getTime()<=Date.now()){
+      store.update('followUps',task.id,{status:'Open',dueAt:new Date().toISOString(),snoozedUntil:null});
+    }
+  }
+}
 
 function scanFollowups(){
+  reopenExpiredSnoozes();
   const db=store.read();
   const audits=db.audits||[],payments=db.payments||[],files=db.files||[],offers=db.offers||[],offerPayments=db.offerPayments||[],assignments=db.assignments||[],productions=db.productions||[];
 
@@ -37,7 +45,7 @@ function scanFollowups(){
       const completed=auditPayments.slice().reverse().find(isComplete)||{};
       ensureFollowUp({key:`audit:${a.id}:paid`,type:'payment-received',priority:'high',title:'R500 audit payment received',message:`R500 audit payment received from ${a.businessName||a.name}.`,...contact,dueAt:completed.updatedAt||completed.createdAt||new Date().toISOString(),recommendedAction:docs.length?'Move audit into human review.':'Request supporting documents.'});
       ensureClientNotice({key:`audit:${a.id}:paid`,auditId:a.id,type:'payment',title:'Payment received',message:'Your R500 Business Readiness Audit payment has been confirmed. Thank you. The Growth Desk will now move your audit into review.'});
-      if(!docs.length && ageMs(completed.updatedAt||completed.createdAt)>=DAY){
+      if(!docs.length&&ageMs(completed.updatedAt||completed.createdAt)>=DAY){
         ensureFollowUp({key:`audit:${a.id}:docs24`,type:'missing-documents',priority:'high',title:'Paid audit waiting for documents',message:`${a.businessName||a.name} paid for the R500 audit but no supporting documents have been uploaded after 24 hours.`,...contact,dueAt:new Date(new Date(completed.updatedAt||completed.createdAt).getTime()+DAY).toISOString(),recommendedAction:'Ask client to upload the documents needed for review.'});
         ensureClientNotice({key:`audit:${a.id}:docs24`,auditId:a.id,type:'reminder',title:'Documents still needed',message:'Your audit payment is confirmed. Please upload the supporting business documents in your Growth Desk so the review can proceed.'});
       }
@@ -46,9 +54,7 @@ function scanFollowups(){
         ensureFollowUp({key:`audit:${a.id}:unpaid24`,type:'unpaid-audit',priority:'high',title:'R500 audit unpaid after 24 hours',message:`${a.businessName||a.name} started the audit but has not completed the R500 payment.`,...contact,dueAt:new Date(new Date(created).getTime()+DAY).toISOString(),recommendedAction:'Send a short payment follow-up and portal link.'});
         ensureClientNotice({key:`audit:${a.id}:unpaid24`,auditId:a.id,type:'reminder',title:'Your audit is waiting',message:'Your Business Readiness Audit is ready to continue. Complete the R500 payment when you are ready to activate the review.'});
       }
-      if(ageMs(created)>=3*DAY){
-        ensureFollowUp({key:`audit:${a.id}:unpaid72`,type:'unpaid-audit',priority:'medium',title:'R500 audit unpaid after 3 days',message:`${a.businessName||a.name} remains unpaid three days after entering the audit funnel.`,...contact,dueAt:new Date(new Date(created).getTime()+3*DAY).toISOString(),recommendedAction:'Make a final helpful follow-up; ask whether the client still wants the audit.'});
-      }
+      if(ageMs(created)>=3*DAY)ensureFollowUp({key:`audit:${a.id}:unpaid72`,type:'unpaid-audit',priority:'medium',title:'R500 audit unpaid after 3 days',message:`${a.businessName||a.name} remains unpaid three days after entering the audit funnel.`,...contact,dueAt:new Date(new Date(created).getTime()+3*DAY).toISOString(),recommendedAction:'Make a final helpful follow-up; ask whether the client still wants the audit.'});
     }
   }
 
@@ -59,12 +65,8 @@ function scanFollowups(){
       ensureFollowUp({key:`offer:${o.id}:paid`,type:'follow-on-paid',priority:'high',title:`Paid follow-on: ${o.service}`,message:`${a.businessName||a.name} paid ${Number(o.amount||0).toLocaleString('en-ZA',{style:'currency',currency:'ZAR'})} for ${o.service}.`,...contact,dueAt:completed.updatedAt||o.paidAt||new Date().toISOString(),recommendedAction:'Confirm assignment, deadline and information checklist.'});
       ensureClientNotice({key:`offer:${o.id}:paid`,auditId:o.auditId,type:'payment',title:`${o.service} payment received`,message:`Your payment for ${o.service} has been confirmed. The Growth Desk has opened the assignment and will show progress in your portal.`});
     }else if(!['Declined','Expired'].includes(o.status)){
-      if(ageMs(created)>=DAY){
-        ensureFollowUp({key:`offer:${o.id}:unpaid24`,type:'unpaid-offer',priority:'high',title:`Offer unpaid: ${o.service}`,message:`${a.businessName||a.name} has had the ${o.service} offer for more than 24 hours without payment.`,...contact,dueAt:new Date(new Date(created).getTime()+DAY).toISOString(),recommendedAction:'Follow up on the offer, scope and payment.'});
-      }
-      if(ageMs(created)>=3*DAY){
-        ensureFollowUp({key:`offer:${o.id}:unpaid72`,type:'unpaid-offer',priority:'medium',title:`Offer still open after 3 days`,message:`${a.businessName||a.name} has not yet paid the ${o.service} offer.`,...contact,dueAt:new Date(new Date(created).getTime()+3*DAY).toISOString(),recommendedAction:'Ask if scope, timing or affordability is blocking the decision.'});
-      }
+      if(ageMs(created)>=DAY)ensureFollowUp({key:`offer:${o.id}:unpaid24`,type:'unpaid-offer',priority:'high',title:`Offer unpaid: ${o.service}`,message:`${a.businessName||a.name} has had the ${o.service} offer for more than 24 hours without payment.`,...contact,dueAt:new Date(new Date(created).getTime()+DAY).toISOString(),recommendedAction:'Follow up on the offer, scope and payment.'});
+      if(ageMs(created)>=3*DAY)ensureFollowUp({key:`offer:${o.id}:unpaid72`,type:'unpaid-offer',priority:'medium',title:'Offer still open after 3 days',message:`${a.businessName||a.name} has not yet paid the ${o.service} offer.`,...contact,dueAt:new Date(new Date(created).getTime()+3*DAY).toISOString(),recommendedAction:'Ask if scope, timing or affordability is blocking the decision.'});
     }
   }
 
@@ -74,9 +76,7 @@ function scanFollowups(){
       ensureFollowUp({key:`assignment:${a.id}:client-info48`,type:'client-information',priority:'high',title:'Assignment waiting for client information',message:`${a.service} for ${audit.businessName||audit.name} has been waiting on client information for 48 hours.`,...contact,dueAt:new Date(new Date(updated).getTime()+2*DAY).toISOString(),recommendedAction:'Remind client exactly which checklist items are outstanding.'});
       ensureClientNotice({key:`assignment:${a.id}:client-info48`,auditId:a.auditId,type:'reminder',title:'Information needed to keep your job moving',message:`Your ${a.service} assignment is waiting for information from you. Please check the production checklist in your portal and provide the outstanding items.`});
     }
-    if(a.status!=='Completed'&&a.deadline&&new Date(a.deadline).getTime()<Date.now()){
-      ensureFollowUp({key:`assignment:${a.id}:overdue`,type:'overdue-assignment',priority:'critical',title:'Paid assignment overdue',message:`${a.service} for ${audit.businessName||audit.name} is past its target delivery date.`,...contact,dueAt:a.deadline,recommendedAction:'Escalate internally, update the client and set a realistic recovery date.'});
-    }
+    if(a.status!=='Completed'&&a.deadline&&new Date(a.deadline).getTime()<Date.now())ensureFollowUp({key:`assignment:${a.id}:overdue`,type:'overdue-assignment',priority:'critical',title:'Paid assignment overdue',message:`${a.service} for ${audit.businessName||audit.name} is past its target delivery date.`,...contact,dueAt:a.deadline,recommendedAction:'Escalate internally, update the client and set a realistic recovery date.'});
     if(a.status==='Completed'&&ageMs(a.completedAt||updated)>=DAY){
       ensureFollowUp({key:`assignment:${a.id}:post-delivery`,type:'post-delivery',priority:'medium',title:'Post-delivery growth opportunity',message:`${a.service} was delivered to ${audit.businessName||audit.name}.`,...contact,dueAt:new Date(new Date(a.completedAt||updated).getTime()+DAY).toISOString(),recommendedAction:'Ask for feedback/testimonial and consider the next suitable service or retainer.'});
       ensureClientNotice({key:`assignment:${a.id}:post-delivery`,auditId:a.auditId,type:'feedback',title:'How did we do?',message:`Your ${a.service} has been delivered. We would value your feedback, and the Growth Desk can help you identify the next practical growth priority when you are ready.`});
