@@ -52,8 +52,8 @@ function acquisitionSnapshot(){
   const db=store.read(),visitors=db.acquisitionVisitors||[],links=db.auditAttributions||[],audits=db.audits||[],payments=db.payments||[],offers=db.offers||[],offerPayments=db.offerPayments||[],leads=db.acquisitionLeads||[];
   const rows=new Map();
   const ensure=touch=>{
-    const source=touch?.source||'direct',campaign=touch?.campaign||'organic',medium=touch?.medium||'none',key=`${source}|${medium}|${campaign}`;
-    if(!rows.has(key))rows.set(key,{source,medium,campaign,visitors:0,conversations:0,whatsappLeads:0,audits:0,paidAudits:0,auditRevenue:0,followOnSales:0,followOnRevenue:0,totalRevenue:0});
+    const source=touch?.source||'direct',campaign=touch?.campaign||'organic',medium=touch?.medium||'none',referralCode=touch?.referralCode||'',key=`${source}|${medium}|${campaign}|${referralCode}`;
+    if(!rows.has(key))rows.set(key,{source,medium,campaign,referralCode,visitors:0,conversations:0,whatsappLeads:0,audits:0,paidAudits:0,auditRevenue:0,followOnSales:0,followOnRevenue:0,totalRevenue:0});
     return rows.get(key);
   };
   for(const v of visitors){const row=ensure(v.firstTouch);row.visitors++;if(v.conversationStarted)row.conversations++;}
@@ -76,7 +76,7 @@ module.exports=function registerAcquisitionRoutes(app){
   app.post('/api/acquisition/lead',(req,res)=>{
     const name=clean(req.body.name),phone=clean(req.body.phone),businessName=clean(req.body.businessName),goal=normalise(req.body.goal).slice(0,1200),visitorId=clean(req.body.visitorId);if(!name||!phone)return res.status(400).json({error:'Name and mobile number are required.'});
     const touch=touchFrom(req.body.touch||req.body);const lead=store.insert('acquisitionLeads',{visitorId,name,phone,businessName,goal,touch,status:'New',source:'Campaign lead capture'});
-    store.insert('followUps',{key:`acquisition-lead:${lead.id}`,type:'campaign-lead',status:'Open',priority:'high',dueAt:new Date().toISOString(),title:'Fresh campaign / WhatsApp lead',message:`${businessName||name} submitted a campaign enquiry from ${touch.source} / ${touch.campaign}.`,name,businessName,email:'',phone,recommendedAction:'Contact the lead while intent is fresh and move them toward a Chancellor conversation or R500 audit.',acquisitionLeadId:lead.id});
+    store.insert('followUps',{key:`acquisition-lead:${lead.id}`,type:'campaign-lead',status:'Open',priority:'high',dueAt:new Date().toISOString(),title:'Fresh campaign / WhatsApp lead',message:`${businessName||name} submitted a campaign enquiry from ${touch.source} / ${touch.campaign}${touch.referralCode?` / referral ${touch.referralCode}`:''}.`,name,businessName,email:'',phone,recommendedAction:'Contact the lead while intent is fresh and move them toward a Chancellor conversation or R500 audit.',acquisitionLeadId:lead.id});
     if(visitorId)track(visitorId,'lead_capture',touch,{label:businessName||name});res.status(201).json({lead:{id:lead.id,name:lead.name,businessName:lead.businessName}});
   });
   app.post('/api/acquisition/link-audit',requireClient,(req,res)=>{
