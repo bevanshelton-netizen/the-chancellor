@@ -1,4 +1,5 @@
 (()=>{
+if(!document.querySelector('link[data-offer-styles]')){const l=document.createElement('link');l.rel='stylesheet';l.href='offers.css?v=20260811-1';l.dataset.offerStyles='1';document.head.appendChild(l)}
 const q=s=>document.querySelector(s),qa=s=>[...document.querySelectorAll(s)],esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=n=>new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR',maximumFractionDigits:0}).format(Number(n||0));
 let loading=false,catalog=[];
 function ensurePanel(){
