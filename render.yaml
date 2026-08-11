@@ -21,7 +21,7 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: APP_URL
-        sync: false
+        value: https://the-chancellor.onrender.com
       - key: ADMIN_EMAIL
         sync: false
       - key: ADMIN_PASSWORD
@@ -35,7 +35,7 @@ services:
       - key: OPENAI_VOICE
         value: cedar
       - key: PAYFAST_MODE
-        value: sandbox
+        sync: false
       - key: PAYFAST_MERCHANT_ID
         sync: false
       - key: PAYFAST_MERCHANT_KEY
