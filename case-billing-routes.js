@@ -1,0 +1,113 @@
+const store=require('./store');
+const {normalise,payfastSignature}=require('./core');
+
+const PLATFORM_FEE_RATE=0.10;
+const money=n=>Math.max(0,Math.round(Number(n||0)*100)/100);
+const db=()=>store.read();
+const findCase=id=>(db().rescueCases||[]).find(c=>c.id===id);
+
+module.exports=function registerCaseBillingRoutes(app){
+  function resolveCase(req,id){
+    const item=findCase(id);
+    if(!item)return null;
+    if(req.session?.admin)return item;
+    if(req.session?.professionalId&&item.assignedProfessionalId===req.session.professionalId)return item;
+    if(req.session?.rescueCaseId===item.id)return item;
+    return null;
+  }
+  const canQuote=req=>Boolean(req.session?.admin||req.session?.professionalId);
+  const canApprove=req=>Boolean(req.session?.admin||req.session?.rescueCaseId);
+  const actor=req=>req.session?.admin?'Admin':req.session?.professionalId?'Professional':'Client';
+  const quotePublic=q=>({id:q.id,caseId:q.caseId,quoteNumber:q.quoteNumber,title:q.title,description:q.description,amount:q.amount,depositAmount:q.depositAmount,platformFeeRate:q.platformFeeRate,platformFee:q.platformFee,professionalGross:q.professionalGross,status:q.status,clientDecisionAt:q.clientDecisionAt,createdAt:q.createdAt,updatedAt:q.updatedAt});
+  const paymentPublic=p=>({id:p.id,caseId:p.caseId,quoteId:p.quoteId,kind:p.kind,amount:p.amount,status:p.status,mode:p.mode,createdAt:p.createdAt,updatedAt:p.updatedAt});
+  const invoicePublic=i=>({id:i.id,caseId:i.caseId,quoteId:i.quoteId,invoiceNumber:i.invoiceNumber,amount:i.amount,platformFee:i.platformFee,professionalPayable:i.professionalPayable,status:i.status,createdAt:i.createdAt,updatedAt:i.updatedAt});
+  const payoutPublic=p=>({id:p.id,caseId:p.caseId,quoteId:p.quoteId,professionalId:p.professionalId,amount:p.amount,status:p.status,reference:p.reference||'',createdAt:p.createdAt,updatedAt:p.updatedAt});
+
+  function ledger(caseId){
+    const d=db();
+    const quotes=(d.caseQuotes||[]).filter(x=>x.caseId===caseId).map(quotePublic);
+    const payments=(d.casePayments||[]).filter(x=>x.caseId===caseId).map(paymentPublic);
+    const invoices=(d.caseInvoices||[]).filter(x=>x.caseId===caseId).map(invoicePublic);
+    const payouts=(d.casePayouts||[]).filter(x=>x.caseId===caseId).map(payoutPublic);
+    const paid=payments.filter(x=>String(x.status).toUpperCase()==='COMPLETE').reduce((s,x)=>s+Number(x.amount||0),0);
+    const platformRevenue=invoices.filter(x=>['Paid','Part-paid'].includes(x.status)).reduce((s,x)=>s+Number(x.platformFee||0),0);
+    const professionalPayable=payouts.filter(x=>x.status!=='Paid out').reduce((s,x)=>s+Number(x.amount||0),0);
+    return {quotes,payments,invoices,payouts,summary:{clientPaid:money(paid),platformRevenue:money(platformRevenue),professionalPayable:money(professionalPayable)}};
+  }
+
+  app.get('/api/case-room/:id/billing',(req,res)=>{const item=resolveCase(req,req.params.id);if(!item)return res.status(403).json({error:'Case billing access denied.'});res.json({caseId:item.id,caseNumber:item.caseNumber,platformFeeRate:PLATFORM_FEE_RATE,...ledger(item.id)});});
+
+  app.post('/api/case-room/:id/quotes',(req,res)=>{
+    const item=resolveCase(req,req.params.id);if(!item)return res.status(403).json({error:'Case billing access denied.'});
+    if(!canQuote(req))return res.status(403).json({error:'Only the assigned professional or administrator can issue a quote.'});
+    const title=normalise(req.body.title).slice(0,180);const amount=money(req.body.amount);const depositAmount=money(req.body.depositAmount||amount);
+    if(!title||amount<=0)return res.status(400).json({error:'Quote title and amount are required.'});
+    if(depositAmount>amount)return res.status(400).json({error:'Deposit cannot exceed the total quote.'});
+    const platformFee=money(amount*PLATFORM_FEE_RATE);const professionalGross=money(amount-platformFee);
+    const q=store.insert('caseQuotes',{caseId:item.id,professionalId:item.assignedProfessionalId||null,quoteNumber:`CQ-${new Date().getFullYear()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`,title,description:normalise(req.body.description).slice(0,1800),amount,depositAmount,platformFeeRate:PLATFORM_FEE_RATE,platformFee,professionalGross,status:'Awaiting client approval',issuedBy:actor(req)});
+    store.insert('caseActivity',{caseId:item.id,actorRole:actor(req),actorName:actor(req)==='Professional'?(item.assignedProfessional||'Professional'):'The Chancellor Command Centre',action:'Professional fee quote issued',detail:`${q.quoteNumber} · R${amount.toFixed(2)}`});
+    res.status(201).json({quote:quotePublic(q)});
+  });
+
+  app.post('/api/case-room/:id/quotes/:quoteId/decision',(req,res)=>{
+    const item=resolveCase(req,req.params.id);if(!item)return res.status(403).json({error:'Case billing access denied.'});
+    if(!canApprove(req))return res.status(403).json({error:'Only the client or administrator can approve or decline a quote.'});
+    const q=(db().caseQuotes||[]).find(x=>x.id===req.params.quoteId&&x.caseId===item.id);if(!q)return res.status(404).json({error:'Quote not found.'});
+    const decision=normalise(req.body.decision);if(!['Approve','Decline'].includes(decision))return res.status(400).json({error:'Choose Approve or Decline.'});
+    const status=decision==='Approve'?'Approved — payment due':'Declined by client';
+    const updated=store.update('caseQuotes',q.id,{status,clientDecisionAt:new Date().toISOString(),clientDecisionNote:normalise(req.body.note).slice(0,800)});
+    store.insert('caseActivity',{caseId:item.id,actorRole:actor(req),actorName:actor(req)==='Client'?(item.name||'Client'):'The Chancellor Command Centre',action:`Quote ${decision.toLowerCase()}d`,detail:q.quoteNumber});
+    res.json({quote:quotePublic(updated)});
+  });
+
+  app.post('/api/case-room/:id/quotes/:quoteId/checkout',(req,res)=>{
+    const item=resolveCase(req,req.params.id);if(!item||req.session?.rescueCaseId!==item.id)return res.status(403).json({error:'Client case access required for payment.'});
+    const q=(db().caseQuotes||[]).find(x=>x.id===req.params.quoteId&&x.caseId===item.id);if(!q)return res.status(404).json({error:'Quote not found.'});
+    if(!String(q.status).startsWith('Approved'))return res.status(409).json({error:'Approve the quote before payment.'});
+    const amount=money(req.body.payFull?' '+q.amount:q.depositAmount||q.amount);
+    if(!process.env.PAYFAST_MERCHANT_ID||!process.env.PAYFAST_MERCHANT_KEY)return res.status(503).json({error:'Online case payment is not configured on this deployment yet.',amount});
+    const base=normalise(process.env.APP_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,'');
+    const paymentId=`case:${item.id}:${q.id}:${Date.now()}`;
+    const fields={merchant_id:process.env.PAYFAST_MERCHANT_ID,merchant_key:process.env.PAYFAST_MERCHANT_KEY,return_url:`${base}/rescue-portal.html?casePayment=returned`,cancel_url:`${base}/rescue-portal.html?casePayment=cancelled`,notify_url:`${base}/api/case-billing/payfast/notify`,name_first:String(item.name||'Client').split(' ')[0],email_address:item.email,m_payment_id:paymentId,amount:amount.toFixed(2),item_name:`${q.quoteNumber} ${q.title}`};
+    fields.signature=payfastSignature(fields,process.env.PAYFAST_PASSPHRASE);
+    const url=String(process.env.PAYFAST_MODE||'sandbox').toLowerCase()==='live'?'https://www.payfast.co.za/eng/process':'https://sandbox.payfast.co.za/eng/process';
+    const p=store.insert('casePayments',{caseId:item.id,quoteId:q.id,professionalId:item.assignedProfessionalId||null,kind:'Professional Case Fee',amount,status:'Initiated',mode:process.env.PAYFAST_MODE||'sandbox',paymentId});
+    res.json({url,fields,payment:paymentPublic(p)});
+  });
+
+  app.post('/api/case-billing/payfast/notify',(req,res)=>{
+    if(!process.env.PAYFAST_MERCHANT_ID||!process.env.PAYFAST_MERCHANT_KEY)return res.status(503).send('Payments not configured');
+    const received=req.body.signature;const fields={...req.body};delete fields.signature;
+    if(!received||payfastSignature(fields,process.env.PAYFAST_PASSPHRASE)!==received)return res.status(400).send('Invalid signature');
+    const paymentId=normalise(req.body.m_payment_id);const parts=paymentId.split(':');if(parts[0]!=='case')return res.status(400).send('Invalid case payment');
+    const caseId=parts[1],quoteId=parts[2];const d=db();const p=[...(d.casePayments||[])].reverse().find(x=>x.paymentId===paymentId);const q=(d.caseQuotes||[]).find(x=>x.id===quoteId&&x.caseId===caseId);const item=(d.rescueCases||[]).find(x=>x.id===caseId);
+    if(!p||!q||!item)return res.status(404).send('Case payment record not found');
+    const status=normalise(req.body.payment_status||'UNKNOWN').toUpperCase();store.update('casePayments',p.id,{status,pfPaymentId:normalise(req.body.pf_payment_id),paidAt:status==='COMPLETE'?new Date().toISOString():null});
+    if(status==='COMPLETE'){
+      const nowPaid=(d.casePayments||[]).filter(x=>x.quoteId===q.id&&String(x.status).toUpperCase()==='COMPLETE').reduce((s,x)=>s+Number(x.amount||0),0)+Number(p.amount||0);
+      const invoiceStatus=nowPaid+0.005>=q.amount?'Paid':'Part-paid';
+      let invoice=(d.caseInvoices||[]).find(x=>x.quoteId===q.id);
+      const invoiceData={caseId,quoteId:q.id,invoiceNumber:invoice?.invoiceNumber||`CI-${new Date().getFullYear()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`,amount:q.amount,platformFee:q.platformFee,professionalPayable:q.professionalGross,status:invoiceStatus};
+      invoice=invoice?store.update('caseInvoices',invoice.id,invoiceData):store.insert('caseInvoices',invoiceData);
+      const payoutExists=(db().casePayouts||[]).find(x=>x.quoteId===q.id);
+      if(!payoutExists)store.insert('casePayouts',{caseId,quoteId:q.id,professionalId:item.assignedProfessionalId||q.professionalId||null,amount:q.professionalGross,status:'Pending payout',reference:''});
+      store.update('caseQuotes',q.id,{status:invoiceStatus==='Paid'?'Paid':'Part-paid'});
+      store.insert('caseActivity',{caseId,actorRole:'System',actorName:'The Chancellor Payments',action:'Case payment received',detail:`${q.quoteNumber} · R${Number(p.amount||0).toFixed(2)} · platform fee R${Number(q.platformFee||0).toFixed(2)}`});
+    }
+    res.sendStatus(200);
+  });
+
+  app.patch('/api/admin/case-payouts/:id',(req,res)=>{
+    if(!req.session?.admin)return res.status(401).json({error:'Administrator sign-in required.'});
+    const payout=(db().casePayouts||[]).find(x=>x.id===req.params.id);if(!payout)return res.status(404).json({error:'Payout record not found.'});
+    const status=normalise(req.body.status).slice(0,80);if(!['Pending payout','Approved for payout','Paid out','On hold'].includes(status))return res.status(400).json({error:'Choose a valid payout status.'});
+    const updated=store.update('casePayouts',payout.id,{status,reference:normalise(req.body.reference).slice(0,180),paidOutAt:status==='Paid out'?new Date().toISOString():payout.paidOutAt||null});
+    res.json({payout:payoutPublic(updated)});
+  });
+
+  app.get('/api/admin/case-billing',(req,res)=>{
+    if(!req.session?.admin)return res.status(401).json({error:'Administrator sign-in required.'});
+    const d=db();const payments=(d.casePayments||[]);const completed=payments.filter(x=>String(x.status).toUpperCase()==='COMPLETE');const payouts=d.casePayouts||[];const invoices=d.caseInvoices||[];
+    res.json({metrics:{caseRevenue:money(completed.reduce((s,x)=>s+Number(x.amount||0),0)),platformFeesEarned:money(invoices.filter(x=>['Paid','Part-paid'].includes(x.status)).reduce((s,x)=>s+Number(x.platformFee||0),0)),professionalPayable:money(payouts.filter(x=>x.status!=='Paid out').reduce((s,x)=>s+Number(x.amount||0),0)),paidOut:money(payouts.filter(x=>x.status==='Paid out').reduce((s,x)=>s+Number(x.amount||0),0))},quotes:d.caseQuotes||[],payments,invoices,payouts});
+  });
+};
