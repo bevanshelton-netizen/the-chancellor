@@ -1,0 +1,45 @@
+const fs=require('node:fs');
+const path=require('node:path');
+const crypto=require('node:crypto');
+const multer=require('multer');
+const store=require('./store');
+const {normalise}=require('./core');
+
+module.exports=function registerCaseRoomRoutes(app){
+  const baseDir=path.join(process.env.DATA_DIR||path.join(__dirname,'data'),'case-room-files');
+  fs.mkdirSync(baseDir,{recursive:true});
+  const allowed=(process.env.ALLOWED_UPLOAD_TYPES||'application/pdf,image/jpeg,image/png').split(',');
+  const upload=multer({storage:multer.diskStorage({destination:baseDir,filename:(_req,file,cb)=>cb(null,`${Date.now()}-${crypto.randomBytes(8).toString('hex')}${path.extname(file.originalname).toLowerCase()}`)}),limits:{fileSize:Number(process.env.MAX_UPLOAD_MB||10)*1024*1024,files:5},fileFilter:(_req,file,cb)=>cb(null,allowed.includes(file.mimetype))});
+  const db=()=>store.read();
+  const findCase=id=>(db().rescueCases||[]).find(c=>c.id===id);
+  const clientCase=req=>req.session?.rescueCaseId?findCase(req.session.rescueCaseId):null;
+  const professionalCase=(req,id)=>{const item=findCase(id);return item&&req.session?.professionalId&&item.assignedProfessionalId===req.session.professionalId?item:null;};
+  const adminCase=(req,id)=>req.session?.admin?findCase(id):null;
+  const roomForCase=caseId=>{
+    const d=db();
+    return {
+      messages:(d.caseMessages||[]).filter(x=>x.caseId===caseId).map(x=>({id:x.id,authorRole:x.authorRole,authorName:x.authorName,message:x.message,createdAt:x.createdAt})),
+      documents:(d.caseDocuments||[]).filter(x=>x.caseId===caseId).map(({storedName,...x})=>x),
+      milestones:(d.caseMilestones||[]).filter(x=>x.caseId===caseId).map(x=>({id:x.id,title:x.title,status:x.status,dueAt:x.dueAt,note:x.note,createdAt:x.createdAt,updatedAt:x.updatedAt})),
+      appointments:(d.caseAppointments||[]).filter(x=>x.caseId===caseId).map(x=>({id:x.id,title:x.title,scheduledAt:x.scheduledAt,mode:x.mode,note:x.note,status:x.status,createdAt:x.createdAt,updatedAt:x.updatedAt})),
+      activity:(d.caseActivity||[]).filter(x=>x.caseId===caseId).map(x=>({id:x.id,action:x.action,actorRole:x.actorRole,actorName:x.actorName,detail:x.detail,createdAt:x.createdAt})).slice(-150)
+    };
+  };
+  const addActivity=(caseId,actorRole,actorName,action,detail='')=>store.insert('caseActivity',{caseId,actorRole,actorName,action,detail:normalise(detail).slice(0,800)});
+  const actor=(req,item)=>req.session?.admin?{role:'Admin',name:'The Chancellor Command Centre'}:req.session?.professionalId?{role:'Professional',name:item.assignedProfessional||'Assigned professional'}:{role:'Client',name:item.name||'Client'};
+
+  app.get('/api/rescue/case-room',(req,res)=>{const item=clientCase(req);if(!item)return res.status(401).json({error:'Rescue case sign-in required.'});res.json({caseId:item.id,caseNumber:item.caseNumber,room:roomForCase(item.id)});});
+  app.get('/api/professionals/cases/:id/room',(req,res)=>{const item=professionalCase(req,req.params.id);if(!item)return res.status(403).json({error:'This case is not assigned to your professional account.'});res.json({caseId:item.id,caseNumber:item.caseNumber,room:roomForCase(item.id)});});
+  app.get('/api/admin/rescue/:id/room',(req,res)=>{const item=adminCase(req,req.params.id);if(!item)return res.status(req.session?.admin?404:401).json({error:req.session?.admin?'Rescue case not found.':'Administrator sign-in required.'});res.json({caseId:item.id,caseNumber:item.caseNumber,room:roomForCase(item.id)});});
+
+  function resolveCase(req){if(req.session?.admin)return adminCase(req,req.params.id);if(req.session?.professionalId)return professionalCase(req,req.params.id);const item=clientCase(req);return item&&item.id===req.params.id?item:null;}
+  app.post('/api/case-room/:id/messages',(req,res)=>{const item=resolveCase(req);if(!item)return res.status(403).json({error:'Case-room access denied.'});const message=normalise(req.body.message).slice(0,2500);if(!message)return res.status(400).json({error:'Write a message first.'});const a=actor(req,item);const entry=store.insert('caseMessages',{caseId:item.id,authorRole:a.role,authorName:a.name,message});addActivity(item.id,a.role,a.name,'Message added',message.slice(0,180));res.status(201).json({message:entry});});
+  app.post('/api/case-room/:id/documents',upload.array('documents',5),(req,res)=>{const item=resolveCase(req);if(!item){(req.files||[]).forEach(f=>{try{fs.unlinkSync(f.path)}catch{}});return res.status(403).json({error:'Case-room access denied.'});}if(!req.files?.length)return res.status(400).json({error:'Choose at least one approved document.'});const a=actor(req,item);const kind=normalise(req.body.documentType||'Case document').slice(0,120);const records=req.files.map(f=>store.insert('caseDocuments',{caseId:item.id,uploadedByRole:a.role,uploadedByName:a.name,documentType:kind,originalName:f.originalname.slice(0,240),storedName:f.filename,mime:f.mimetype,size:f.size,status:'Received'}));addActivity(item.id,a.role,a.name,'Documents uploaded',`${records.length} file(s) · ${kind}`);res.status(201).json({documents:records.map(({storedName,...x})=>x)});});
+  app.get('/api/case-room/:id/documents/:documentId/download',(req,res)=>{const item=resolveCase(req);if(!item)return res.status(403).json({error:'Case-room access denied.'});const f=(db().caseDocuments||[]).find(x=>x.id===req.params.documentId&&x.caseId===item.id);if(!f)return res.status(404).json({error:'Document not found.'});const full=path.join(baseDir,f.storedName);if(!fs.existsSync(full))return res.status(404).json({error:'Document file is unavailable.'});res.download(full,f.originalName);});
+
+  app.post('/api/case-room/:id/milestones',(req,res)=>{const item=resolveCase(req);if(!item)return res.status(403).json({error:'Case-room access denied.'});if(!req.session?.professionalId&&!req.session?.admin)return res.status(403).json({error:'Only the assigned professional or administrator can create milestones.'});const title=normalise(req.body.title).slice(0,180);if(!title)return res.status(400).json({error:'Milestone title is required.'});const a=actor(req,item);const m=store.insert('caseMilestones',{caseId:item.id,title,status:normalise(req.body.status||'Open').slice(0,80),dueAt:normalise(req.body.dueAt).slice(0,80),note:normalise(req.body.note).slice(0,800)});addActivity(item.id,a.role,a.name,'Milestone created',title);res.status(201).json({milestone:m});});
+  app.patch('/api/case-room/:id/milestones/:milestoneId',(req,res)=>{const item=resolveCase(req);if(!item)return res.status(403).json({error:'Case-room access denied.'});if(!req.session?.professionalId&&!req.session?.admin)return res.status(403).json({error:'Only the assigned professional or administrator can update milestones.'});const existing=(db().caseMilestones||[]).find(x=>x.id===req.params.milestoneId&&x.caseId===item.id);if(!existing)return res.status(404).json({error:'Milestone not found.'});const patch={};['title','status','dueAt','note'].forEach(k=>{if(req.body[k]!==undefined)patch[k]=normalise(req.body[k]).slice(0,k==='note'?800:180)});const updated=store.update('caseMilestones',existing.id,patch);const a=actor(req,item);addActivity(item.id,a.role,a.name,'Milestone updated',`${updated.title} · ${updated.status}`);res.json({milestone:updated});});
+
+  app.post('/api/case-room/:id/appointments',(req,res)=>{const item=resolveCase(req);if(!item)return res.status(403).json({error:'Case-room access denied.'});if(!req.session?.professionalId&&!req.session?.admin)return res.status(403).json({error:'Only the assigned professional or administrator can schedule appointments.'});const title=normalise(req.body.title).slice(0,180);const scheduledAt=normalise(req.body.scheduledAt).slice(0,80);if(!title||!scheduledAt)return res.status(400).json({error:'Appointment title and date/time are required.'});const a=actor(req,item);const appt=store.insert('caseAppointments',{caseId:item.id,title,scheduledAt,mode:normalise(req.body.mode||'Online / phone').slice(0,120),note:normalise(req.body.note).slice(0,800),status:'Scheduled'});addActivity(item.id,a.role,a.name,'Appointment scheduled',`${title} · ${scheduledAt}`);res.status(201).json({appointment:appt});});
+  app.patch('/api/case-room/:id/appointments/:appointmentId',(req,res)=>{const item=resolveCase(req);if(!item)return res.status(403).json({error:'Case-room access denied.'});if(!req.session?.professionalId&&!req.session?.admin)return res.status(403).json({error:'Only the assigned professional or administrator can update appointments.'});const existing=(db().caseAppointments||[]).find(x=>x.id===req.params.appointmentId&&x.caseId===item.id);if(!existing)return res.status(404).json({error:'Appointment not found.'});const patch={};['title','scheduledAt','mode','note','status'].forEach(k=>{if(req.body[k]!==undefined)patch[k]=normalise(req.body[k]).slice(0,k==='note'?800:180)});const updated=store.update('caseAppointments',existing.id,patch);const a=actor(req,item);addActivity(item.id,a.role,a.name,'Appointment updated',`${updated.title} · ${updated.status}`);res.json({appointment:updated});});
+};
