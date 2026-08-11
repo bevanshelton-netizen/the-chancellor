@@ -6,11 +6,12 @@ require('./production-routes')(app);
 require('./intelligence-routes')(app);
 require('./export-routes')(app);
 require('./followup-routes')(app);
+require('./acquisition-routes')(app);
 const {scanFollowups}=require('./followup-engine');
 
 const port = Number(process.env.PORT || 3000);
 const server = app.listen(port, () => {
-  console.log(`Growth Desk revenue, delivery, production, document intelligence and follow-up server ready at http://localhost:${port}`);
+  console.log(`Growth Desk revenue, delivery, production, document intelligence, follow-up and acquisition server ready at http://localhost:${port}`);
   try{scanFollowups()}catch(error){console.error('Initial follow-up scan failed:',error.message)}
 });
 
