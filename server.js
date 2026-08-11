@@ -7,8 +7,8 @@ const multer = require('multer');
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
-const store = require('./lib/store');
-const { normalise, hashSecret, verifySecret, accessCode, payfastSignature, scoreAudit, cleanPublicAudit } = require('./lib/core');
+const store = require('./store');
+const { normalise, hashSecret, verifySecret, accessCode, payfastSignature, scoreAudit, cleanPublicAudit } = require('./core');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -29,7 +29,8 @@ const sessionDir = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'
 fs.mkdirSync(sessionDir, { recursive: true });
 app.use(session({ store: new FileStore({ path: sessionDir, retries: 1, ttl: 8 * 60 * 60 }), name: 'growthdesk.sid', secret: process.env.SESSION_SECRET || 'development-only-change-this-secret', resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: isProd, sameSite: 'lax', maxAge: 8 * 60 * 60 * 1000 } }));
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 80, standardHeaders: true, legacyHeaders: false }));
-app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
+app.use('/assets', express.static(__dirname, { dotfiles: 'deny' }));
+app.use(express.static(__dirname, { extensions: ['html'], dotfiles: 'deny' }));
 
 const requireClient = (req, res, next) => req.session.clientId ? next() : res.status(401).json({ error: 'Please sign in to continue.' });
 const requireAdmin = (req, res, next) => req.session.admin ? next() : res.status(401).json({ error: 'Administrator sign-in required.' });
