@@ -27,6 +27,6 @@ let chatTracked=false,auditTracked=false;
 function chat(){if(chatTracked)return;chatTracked=true;send('conversation_started',{label:'The Chancellor chat'})}
 function audit(){if(auditTracked)return;auditTracked=true;send('audit_started',{label:'R500 Business Readiness Audit'})}
 document.addEventListener('submit',e=>{if(e.target?.id==='chatForm')chat();if(e.target?.id==='auditForm')audit()});
-document.addEventListener('click',e=>{const el=e.target.closest('a,button');if(!el)return;const href=el.getAttribute('href')||'';const text=clean(el.textContent);if(href.includes('#adviser')||el.closest('#adviser')){if(href.includes('#adviser'))send('campaign_cta',{label:text,href});}if(href.includes('#audit')){audit();send('campaign_cta',{label:text,href})}if(/whatsapp|wa\.me/i.test(href)){send('whatsapp_click',{label:text,href})}});
+document.addEventListener('click',e=>{const el=e.target.closest('a,button');if(!el)return;const href=el.getAttribute('href')||'';const text=clean(el.textContent);if(el.closest('#quick')||el.id==='micButton')chat();if(href.includes('#adviser')||el.closest('#adviser')){if(href.includes('#adviser'))send('campaign_cta',{label:text,href});}if(href.includes('#audit')){audit();send('campaign_cta',{label:text,href})}if(/whatsapp|wa\.me/i.test(href)){send('whatsapp_click',{label:text,href})}});
 const af=document.querySelector('#auditForm');if(af)af.addEventListener('focusin',audit,{once:true});
 })();
