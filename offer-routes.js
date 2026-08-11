@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const dns = require('node:dns').promises;
 const store = require('./store');
 const { normalise, payfastSignature } = require('./core');
+const { ensureAssignment } = require('./delivery-core');
 
 const catalog = [
   { code:'profile-revamp', label:'Company Profile Revamp', floor:1500, defaultAmount:1500 },
@@ -102,7 +103,11 @@ module.exports = function registerOfferRoutes(app){
       const signatureOk=validItnSignature(req.body),merchantOk=normalise(req.body.merchant_id)===normalise(process.env.PAYFAST_MERCHANT_ID),amountOk=Math.abs(Number(req.body.amount_gross)-Number(offer.amount))<=0.01,sourceOk=await validSource(req),serverOk=await validServer(req.body);
       if(!(signatureOk&&merchantOk&&amountOk&&sourceOk&&serverOk))return res.status(400).send('Invalid payment notification');
       const payment=(db.offerPayments||[]).slice().reverse().find(p=>p.offerId===offer.id&&p.paymentId===req.body.m_payment_id);if(payment)store.update('offerPayments',payment.id,{status:req.body.payment_status||'COMPLETE',pfPaymentId:req.body.pf_payment_id});
-      if(req.body.payment_status==='COMPLETE'){store.update('offers',offer.id,{status:'Paid',paidAt:new Date().toISOString()});store.update('audits',offer.auditId,{salesStage:'Follow-on paid',recommendedService:offer.service,quoteAmount:offer.amount,nextAction:'Begin delivery'})}
+      if(req.body.payment_status==='COMPLETE'){
+        const paid=store.update('offers',offer.id,{status:'Paid',paidAt:new Date().toISOString()});
+        store.update('audits',offer.auditId,{salesStage:'Follow-on paid',recommendedService:offer.service,quoteAmount:offer.amount,nextAction:'Begin delivery'});
+        ensureAssignment(paid);
+      }
       res.sendStatus(200);
     }catch(error){console.error('Offer PayFast ITN failed:',error.message);res.status(400).send('Payment validation failed')}
   });
