@@ -25,21 +25,47 @@ function auditContact(a={}){return {auditId:a.id,name:a.name,businessName:a.busi
 function reopenExpiredSnoozes(){
   const db=store.read();
   for(const task of db.followUps||[]){
-    if(task.status==='Snoozed'&&task.snoozedUntil&&new Date(task.snoozedUntil).getTime()<=Date.now()){
-      store.update('followUps',task.id,{status:'Open',dueAt:new Date().toISOString(),snoozedUntil:null});
+    if(task.status==='Snoozed'&&task.snoozedUntil&&new Date(task.snoozedUntil).getTime()<=Date.now())store.update('followUps',task.id,{status:'Open',dueAt:new Date().toISOString(),snoozedUntil:null});
+  }
+}
+function resolveMatching(predicate,reason){
+  const db=store.read();
+  for(const task of db.followUps||[]){
+    if(['Open','Snoozed'].includes(task.status)&&predicate(task))store.update('followUps',task.id,{status:'Resolved',resolvedAt:new Date().toISOString(),resolution:reason,snoozedUntil:null});
+  }
+}
+function reconcileProgress({audits,payments,files,offers,offerPayments,assignments,productions}){
+  for(const a of audits){
+    const paid=payments.filter(p=>p.auditId===a.id).some(isComplete),hasDocs=files.some(f=>f.auditId===a.id);
+    if(paid){
+      resolveMatching(t=>t.key===`lead:${a.id}:new`||t.key.startsWith(`audit:${a.id}:unpaid`),'Client completed the R500 audit payment.');
+      if(hasDocs)resolveMatching(t=>t.key===`audit:${a.id}:docs24`,'Client documents have been received.');
     }
+  }
+  for(const o of offers){
+    const paid=o.status==='Paid'||offerPayments.filter(p=>p.offerId===o.id).some(isComplete);
+    if(paid)resolveMatching(t=>t.key.startsWith(`offer:${o.id}:unpaid`),'Follow-on offer has been paid.');
+    else if(['Declined','Expired'].includes(o.status))resolveMatching(t=>t.key.startsWith(`offer:${o.id}:unpaid`),`Offer is ${String(o.status).toLowerCase()}.`);
+  }
+  for(const a of assignments){
+    if(a.status!=='Waiting for client information')resolveMatching(t=>t.key===`assignment:${a.id}:client-info48`,'Assignment is no longer waiting for client information.');
+    if(a.status==='Completed')resolveMatching(t=>t.key===`assignment:${a.id}:overdue`,'Assignment has been completed.');
+  }
+  for(const p of productions){
+    if(p.status!=='Human review')resolveMatching(t=>t.key===`production:${p.id}:review24`,'Production item moved out of human review.');
   }
 }
 
 function scanFollowups(){
   reopenExpiredSnoozes();
-  const db=store.read();
+  let db=store.read();
   const audits=db.audits||[],payments=db.payments||[],files=db.files||[],offers=db.offers||[],offerPayments=db.offerPayments||[],assignments=db.assignments||[],productions=db.productions||[];
+  reconcileProgress({audits,payments,files,offers,offerPayments,assignments,productions});
 
   for(const a of audits){
     const contact=auditContact(a),created=a.createdAt||new Date().toISOString();
     const auditPayments=payments.filter(p=>p.auditId===a.id),paid=auditPayments.some(isComplete),docs=files.filter(f=>f.auditId===a.id);
-    ensureFollowUp({key:`lead:${a.id}:new`,type:'new-lead',priority:'high',title:'New R500 audit lead',message:`${a.businessName||a.name} entered the Business Readiness Audit funnel. Make contact while intent is fresh.`,...contact,dueAt:created,recommendedAction:'Contact lead and move them to R500 audit payment.'});
+    if(!paid)ensureFollowUp({key:`lead:${a.id}:new`,type:'new-lead',priority:'high',title:'New R500 audit lead',message:`${a.businessName||a.name} entered the Business Readiness Audit funnel. Make contact while intent is fresh.`,...contact,dueAt:created,recommendedAction:'Contact lead and move them to R500 audit payment.'});
 
     if(paid){
       const completed=auditPayments.slice().reverse().find(isComplete)||{};
