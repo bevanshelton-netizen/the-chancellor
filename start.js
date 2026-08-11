@@ -1,4 +1,5 @@
 const app = require('./server');
+require('./membership-routes')(app);
 
 const port = Number(process.env.PORT || 3000);
 
