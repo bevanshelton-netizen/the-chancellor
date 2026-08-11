@@ -1,0 +1,79 @@
+const store=require('./store');
+const {normalise}=require('./core');
+
+const requireAdmin=(req,res,next)=>req.session?.admin?next():res.status(401).json({error:'Administrator sign-in required.'});
+const requireClient=(req,res,next)=>req.session?.clientId?next():res.status(401).json({error:'Please sign in to continue.'});
+const clean=v=>normalise(v).slice(0,300);
+const channel=v=>clean(v||'direct').toLowerCase().replace(/[^a-z0-9._-]+/g,'-').slice(0,80)||'direct';
+
+function touchFrom(body={}){
+  return {
+    source:channel(body.source||body.utm_source||'direct'),
+    medium:channel(body.medium||body.utm_medium||'none'),
+    campaign:channel(body.campaign||body.utm_campaign||'organic'),
+    content:clean(body.content||body.utm_content),
+    term:clean(body.term||body.utm_term),
+    referralCode:clean(body.referralCode||body.ref),
+    landingPath:clean(body.landingPath||body.path||'/'),
+    referrer:clean(body.referrer)
+  };
+}
+function getVisitor(id){return (store.read().acquisitionVisitors||[]).find(v=>v.visitorId===id)||null;}
+function upsertVisitor(visitorId,touch,patch={}){
+  if(!visitorId)return null;
+  const current=getVisitor(visitorId),now=new Date().toISOString();
+  if(current)return store.update('acquisitionVisitors',current.id,{lastTouch:touch,lastSeenAt:now,...patch});
+  return store.insert('acquisitionVisitors',{visitorId,firstTouch:touch,lastTouch:touch,firstSeenAt:now,lastSeenAt:now,conversationStarted:false,auditStarted:false,auditId:null,...patch});
+}
+function track(visitorId,event,touch,metadata={}){
+  const allowed=['page_view','campaign_cta','conversation_started','audit_started','audit_created','whatsapp_click','lead_capture'];
+  if(!allowed.includes(event))return null;
+  const visitor=upsertVisitor(visitorId,touch,event==='conversation_started'?{conversationStarted:true}:event==='audit_started'?{auditStarted:true}:{});
+  return store.insert('acquisitionEvents',{visitorId,visitorRecordId:visitor?.id||null,event,touch,metadata,occurredAt:new Date().toISOString()});
+}
+function auditAttribution(auditId){return (store.read().auditAttributions||[]).find(x=>x.auditId===auditId)||null;}
+function linkAudit(visitorId,auditId){
+  if(!visitorId||!auditId)return null;
+  const visitor=getVisitor(visitorId);if(!visitor)return null;
+  const current=auditAttribution(auditId);
+  const record={auditId,visitorId,firstTouch:visitor.firstTouch,lastTouch:visitor.lastTouch,linkedAt:new Date().toISOString()};
+  if(current)store.update('auditAttributions',current.id,record);else store.insert('auditAttributions',record);
+  store.update('acquisitionVisitors',visitor.id,{auditId});
+  return record;
+}
+function completed(p){return String(p?.status||'').toUpperCase()==='COMPLETE';}
+function acquisitionSnapshot(){
+  const db=store.read(),visitors=db.acquisitionVisitors||[],links=db.auditAttributions||[],audits=db.audits||[],payments=db.payments||[],offers=db.offers||[],offerPayments=db.offerPayments||[],leads=db.acquisitionLeads||[];
+  const rows=new Map();
+  const ensure=touch=>{
+    const source=touch?.source||'direct',campaign=touch?.campaign||'organic',medium=touch?.medium||'none',key=`${source}|${medium}|${campaign}`;
+    if(!rows.has(key))rows.set(key,{source,medium,campaign,visitors:0,conversations:0,whatsappLeads:0,audits:0,paidAudits:0,auditRevenue:0,followOnSales:0,followOnRevenue:0,totalRevenue:0});
+    return rows.get(key);
+  };
+  for(const v of visitors){const row=ensure(v.firstTouch);row.visitors++;if(v.conversationStarted)row.conversations++;}
+  for(const l of leads){ensure(l.touch).whatsappLeads++;}
+  for(const link of links){
+    const row=ensure(link.firstTouch),audit=audits.find(a=>a.id===link.auditId);if(!audit)continue;row.audits++;
+    const auditPaid=payments.filter(p=>p.auditId===audit.id).filter(completed);if(auditPaid.length){row.paidAudits++;const amt=auditPaid.reduce((s,p)=>s+Number(p.amount||500),0);row.auditRevenue+=amt;row.totalRevenue+=amt;}
+    const offerIds=offers.filter(o=>o.auditId===audit.id).map(o=>o.id);const paidOffers=offerPayments.filter(p=>offerIds.includes(p.offerId)&&completed(p));if(paidOffers.length){row.followOnSales+=paidOffers.length;const amt=paidOffers.reduce((s,p)=>s+Number(p.amount||0),0);row.followOnRevenue+=amt;row.totalRevenue+=amt;}
+  }
+  const channels=[...rows.values()].map(r=>({...r,auditConversion:r.visitors?Math.round(r.paidAudits/r.visitors*1000)/10:0,leadToAuditConversion:r.audits?Math.round(r.paidAudits/r.audits*1000)/10:0})).sort((a,b)=>b.totalRevenue-a.totalRevenue||b.paidAudits-a.paidAudits||b.visitors-a.visitors);
+  return {metrics:{visitors:visitors.length,conversations:visitors.filter(v=>v.conversationStarted).length,whatsappLeads:leads.length,audits:links.length,paidAudits:channels.reduce((s,r)=>s+r.paidAudits,0),attributedRevenue:channels.reduce((s,r)=>s+r.totalRevenue,0)},channels,recentLeads:leads.slice().reverse().slice(0,30)};
+}
+
+module.exports=function registerAcquisitionRoutes(app){
+  app.post('/api/acquisition/event',(req,res)=>{
+    const visitorId=clean(req.body.visitorId);if(!visitorId)return res.status(400).json({error:'Visitor ID is required.'});
+    const touch=touchFrom(req.body.touch||req.body),event=clean(req.body.event);const metadata={label:clean(req.body.label),href:clean(req.body.href)};
+    const item=track(visitorId,event,touch,metadata);if(!item)return res.status(400).json({error:'Unsupported acquisition event.'});res.status(201).json({ok:true});
+  });
+  app.post('/api/acquisition/lead',(req,res)=>{
+    const name=clean(req.body.name),phone=clean(req.body.phone),businessName=clean(req.body.businessName),goal=normalise(req.body.goal).slice(0,1200),visitorId=clean(req.body.visitorId);if(!name||!phone)return res.status(400).json({error:'Name and mobile number are required.'});
+    const touch=touchFrom(req.body.touch||req.body);const lead=store.insert('acquisitionLeads',{visitorId,name,phone,businessName,goal,touch,status:'New',source:'Campaign lead capture'});if(visitorId)track(visitorId,'lead_capture',touch,{label:businessName||name});res.status(201).json({lead:{id:lead.id,name:lead.name,businessName:lead.businessName}});
+  });
+  app.post('/api/acquisition/link-audit',requireClient,(req,res)=>{
+    const visitorId=clean(req.body.visitorId),auditId=req.session.clientId;const linked=linkAudit(visitorId,auditId);if(!linked)return res.status(404).json({error:'Acquisition visitor could not be linked.'});
+    const visitor=getVisitor(visitorId);track(visitorId,'audit_created',visitor?.lastTouch||touchFrom({}),{label:auditId});res.json({ok:true});
+  });
+  app.get('/api/admin/acquisition',requireAdmin,(_req,res)=>res.json(acquisitionSnapshot()));
+};
