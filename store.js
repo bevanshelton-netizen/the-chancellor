@@ -4,7 +4,7 @@ const crypto = require('node:crypto');
 
 const dataDir = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, '..', 'data');
 const file = path.join(dataDir, 'desk.json');
-const empty = { audits: [], messages: [], files: [], payments: [], rescueCases: [], professionals: [], credentialFiles: [], firms: [] };
+const empty = { audits: [], messages: [], files: [], payments: [], offers: [], offerPayments: [], rescueCases: [], professionals: [], credentialFiles: [], firms: [] };
 function ensure() { fs.mkdirSync(dataDir, { recursive: true }); if (!fs.existsSync(file)) fs.writeFileSync(file, JSON.stringify(empty, null, 2)); }
 function read() { ensure(); try { return { ...empty, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch { return structuredClone(empty); } }
 function write(data) { ensure(); const tmp = `${file}.tmp`; fs.writeFileSync(tmp, JSON.stringify(data, null, 2)); fs.renameSync(tmp, file); return data; }
