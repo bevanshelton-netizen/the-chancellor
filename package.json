@@ -1,12 +1,12 @@
 {
   "name": "the-chancellors-business-growth-desk",
-  "version": "4.0.0",
+  "version": "5.0.0",
   "private": true,
   "description": "Production-ready revenue operations website for The Chancellor's Business Growth Desk",
-  "main": "start.js",
+  "main": "revenue-server.js",
   "scripts": {
-    "start": "node start.js",
-    "dev": "node --watch start.js",
+    "start": "node revenue-server.js",
+    "dev": "node --watch revenue-server.js",
     "test": "node tests/core.test.js"
   },
   "engines": { "node": ">=20" },
