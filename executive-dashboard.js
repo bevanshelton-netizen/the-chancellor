@@ -61,3 +61,4 @@ setTimeout(loadExecutive,700);
 if(!document.querySelector('script[data-offer-desk]')){const s=document.createElement('script');s.src='offers-admin.js?v=20260811-2';s.dataset.offerDesk='1';document.body.appendChild(s)}
 if(!document.querySelector('script[data-delivery-desk]')){const s=document.createElement('script');s.src='delivery-admin.js?v=20260811-1';s.dataset.deliveryDesk='1';document.body.appendChild(s)}
 if(!document.querySelector('script[data-production-desk]')){const s=document.createElement('script');s.src='production-admin.js?v=20260811-1';s.dataset.productionDesk='1';document.body.appendChild(s)}
+if(!document.querySelector('script[data-intelligence-desk]')){const s=document.createElement('script');s.src='intelligence-admin.js?v=20260811-1';s.dataset.intelligenceDesk='1';document.body.appendChild(s)}
