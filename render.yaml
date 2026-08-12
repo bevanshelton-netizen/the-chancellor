@@ -42,7 +42,31 @@ services:
         sync: false
       - key: PAYFAST_PASSPHRASE
         sync: false
+      - key: CASE_PLATFORM_FEE_RATE
+        value: "0.10"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: COMMS_FROM_EMAIL
+        sync: false
+      - key: COMMS_MOBILE_CHANNEL
+        value: sms
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_FROM_NUMBER
+        sync: false
+      - key: TWILIO_WHATSAPP_FROM
+        sync: false
+      - key: ADMIN_ALERT_EMAIL
+        sync: false
+      - key: ADMIN_ALERT_PHONE
+        sync: false
+      - key: COMMS_SCAN_INTERVAL_MINUTES
+        value: "30"
       - key: MAX_UPLOAD_MB
-        value: 10
+        value: "10"
+      - key: MAX_DELIVERABLE_MB
+        value: "20"
       - key: ALLOWED_UPLOAD_TYPES
         value: application/pdf,image/jpeg,image/png,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
