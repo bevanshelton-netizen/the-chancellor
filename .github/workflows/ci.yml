@@ -28,3 +28,5 @@ jobs:
           exit "$failed"
       - name: Core integrity tests
         run: npm test
+      - name: Deployment readiness files
+        run: npm run deploy:check
