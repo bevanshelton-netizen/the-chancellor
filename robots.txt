@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /portal.html
+Disallow: /rescue-portal.html
+Disallow: /professional-portal.html
+Disallow: /partner-portal.html
+Disallow: /institutional-portal.html
+Disallow: /api/
+
+Sitemap: https://the-chancellor.onrender.com/sitemap.xml
