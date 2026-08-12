@@ -34,6 +34,8 @@ const sessionDir = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'
 fs.mkdirSync(sessionDir, { recursive: true });
 app.use(session({ store: new FileStore({ path: sessionDir, retries: 1, ttl: 8 * 60 * 60 }), name: 'growthdesk.sid', secret: sessionSecret, resave: false, saveUninitialized: false, cookie: { httpOnly: true, secure: isProd, sameSite: 'lax', maxAge: 8 * 60 * 60 * 1000 } }));
 app.use('/api', rateLimit({ windowMs: 60_000, limit: 80, standardHeaders: true, legacyHeaders: false }));
+const authLimiter=rateLimit({windowMs:15*60_000,limit:20,standardHeaders:true,legacyHeaders:false,skipSuccessfulRequests:true,message:{error:'Too many sign-in attempts. Please try again later.'}});
+app.use(['/api/auth/admin','/api/auth/client','/api/rescue/access','/api/professionals/access','/api/referrals/partners/access','/api/institutions/access'],authLimiter);
 
 function embeddedBrandImage(svgFile) {
   const svg = fs.readFileSync(path.join(__dirname, 'assets', svgFile), 'utf8');
@@ -59,9 +61,16 @@ try {
   console.error('Brand image route setup failed:', error.message);
 }
 
-// Correct asset mapping: /assets/x must resolve inside the assets directory.
+// Do not expose backend source, configuration or operational files through the root static server.
+const privateStaticPatterns=[
+  /^\/(?:server|revenue-server|start|store|core|rescue-triage|.*-routes|.*-engine|.*-core)\.js$/i,
+  /^\/(?:package(?:-lock)?\.json|render\.ya?ml|Dockerfile|\.env(?:\..*)?)$/i,
+  /^\/(?:tests|data|node_modules|supabase|lib|app)(?:\/|$)/i,
+  /\.(?:md|ya?ml|lock)$/i
+];
+app.use((req,res,next)=>{if((req.method==='GET'||req.method==='HEAD')&&privateStaticPatterns.some(rx=>rx.test(req.path)))return res.status(404).end();next();});
 app.use('/assets', express.static(path.join(__dirname, 'assets'), { dotfiles: 'deny', maxAge: isProd ? '1h' : 0 }));
-app.use(express.static(__dirname, { extensions: ['html'], dotfiles: 'deny' }));
+app.use(express.static(__dirname, { extensions: ['html'], dotfiles: 'deny', index: 'index.html' }));
 
 const requireClient = (req, res, next) => req.session.clientId ? next() : res.status(401).json({ error: 'Please sign in to continue.' });
 const requireAdmin = (req, res, next) => req.session.admin ? next() : res.status(401).json({ error: 'Administrator sign-in required.' });
@@ -72,7 +81,7 @@ const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, f
 
 require('./rescue-routes')(app, { store, normalise, hashSecret, verifySecret, accessCode });
 
-app.get('/api/health', (_, res) => res.json({ ok: true, service: "The Chancellor's Business Growth Desk", paymentMode }));
+app.get('/api/health', (_, res) => res.json({ ok: true, service: "The Chancellor's Business Growth Desk", paymentMode, node:process.version }));
 app.get('/api/status', (_, res) => res.json({ liveAI: Boolean(process.env.OPENAI_API_KEY), voice: Boolean(process.env.OPENAI_API_KEY), admin: Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD), payments: paymentConfigured, paymentMode }));
 
 app.post('/api/speech', async (req, res) => {
@@ -142,8 +151,7 @@ app.post('/api/auth/admin', (req, res) => {
   const expectedPassword = Buffer.from(String(process.env.ADMIN_PASSWORD));
   const passwordOk = suppliedPassword.length === expectedPassword.length && crypto.timingSafeEqual(suppliedPassword, expectedPassword);
   if (!emailOk || !passwordOk) return res.status(401).json({ error: 'Sign-in details are incorrect.' });
-  req.session.admin = true;
-  res.json({ ok: true });
+  req.session.regenerate(error=>{if(error)return res.status(500).json({error:'Could not establish administrator session.'});req.session.admin=true;res.json({ok:true});});
 });
 
 app.post('/api/auth/logout', (req, res) => req.session.destroy(() => res.json({ ok: true })));
@@ -165,12 +173,8 @@ app.post('/api/uploads', requireClient, upload.array('documents', 5), (req, res)
   res.status(201).json({ files: records.map(({ storedName, ...f }) => f), audit: audit ? cleanPublicAudit(audit) : null });
 });
 
-function pfEncode(value) {
-  return encodeURIComponent(String(value).trim()).replace(/%20/g, '+');
-}
-function pfParamString(fields) {
-  return Object.entries(fields).filter(([key, value]) => key !== 'signature' && value !== undefined && value !== null && value !== '').map(([key, value]) => `${key}=${pfEncode(value)}`).join('&');
-}
+function pfEncode(value) { return encodeURIComponent(String(value).trim()).replace(/%20/g, '+'); }
+function pfParamString(fields) { return Object.entries(fields).filter(([key, value]) => key !== 'signature' && value !== undefined && value !== null && value !== '').map(([key, value]) => `${key}=${pfEncode(value)}`).join('&'); }
 
 app.post('/api/payfast/checkout', requireClient, (req, res) => {
   if (!paymentConfigured) return res.status(503).json({ error: 'Online payment is not configured on this deployment yet.' });
@@ -191,82 +195,34 @@ app.post('/api/payfast/checkout', requireClient, (req, res) => {
 app.post('/api/payfast/notify', async (req, res) => {
   if (!paymentConfigured) return res.status(503).send('Payments not configured');
   const receivedSignature = normalise(req.body.signature).toLowerCase();
-  const fields = { ...req.body };
-  delete fields.signature;
+  const fields = { ...req.body }; delete fields.signature;
   if (!receivedSignature || payfastSignature(fields, process.env.PAYFAST_PASSPHRASE) !== receivedSignature) return res.status(400).send('Invalid signature');
   if (String(req.body.merchant_id || '') !== String(process.env.PAYFAST_MERCHANT_ID)) return res.status(400).send('Invalid merchant');
-
-  const auditId = normalise(req.body.m_payment_id);
-  const db = store.read();
-  const audit = db.audits.find(a => a.id === auditId);
-  const payment = [...db.payments].reverse().find(p => p.auditId === auditId);
+  const auditId = normalise(req.body.m_payment_id); const db = store.read(); const audit = db.audits.find(a => a.id === auditId); const payment = [...db.payments].reverse().find(p => p.auditId === auditId);
   if (!audit || !payment) return res.status(404).send('Payment record not found');
-
-  const gross = Number(req.body.amount_gross || 0);
-  if (!Number.isFinite(gross) || Math.abs(gross - Number(payment.amount || 500)) > 0.01) return res.status(400).send('Amount mismatch');
-
-  try {
-    const validateUrl = paymentMode === 'live' ? 'https://www.payfast.co.za/eng/query/validate' : 'https://sandbox.payfast.co.za/eng/query/validate';
-    const validation = await fetch(validateUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: pfParamString(req.body) });
-    const validationText = (await validation.text()).trim();
-    if (!validation.ok || validationText !== 'VALID') return res.status(400).send('PayFast validation failed');
-  } catch {
-    return res.status(502).send('Could not validate with PayFast');
-  }
-
+  const gross = Number(req.body.amount_gross || 0); if (!Number.isFinite(gross) || Math.abs(gross - Number(payment.amount || 500)) > 0.01) return res.status(400).send('Amount mismatch');
+  try { const validateUrl = paymentMode === 'live' ? 'https://www.payfast.co.za/eng/query/validate' : 'https://sandbox.payfast.co.za/eng/query/validate'; const validation = await fetch(validateUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: pfParamString(req.body) }); const validationText = (await validation.text()).trim(); if (!validation.ok || validationText !== 'VALID') return res.status(400).send('PayFast validation failed'); }
+  catch { return res.status(502).send('Could not validate with PayFast'); }
   const status = normalise(req.body.payment_status || 'UNKNOWN').toUpperCase();
   store.update('payments', payment.id, { status, pfPaymentId: normalise(req.body.pf_payment_id), amountGross: gross, amountFee: Number(req.body.amount_fee || 0), amountNet: Number(req.body.amount_net || 0), validatedAt: new Date().toISOString() });
-  if (status === 'COMPLETE') {
-    const hasDocs = db.files.some(f => f.auditId === auditId);
-    store.update('audits', auditId, { status: hasDocs ? 'Paid — documents received' : 'Paid — awaiting documents', salesStage: 'Paid audit', nextAction: hasDocs ? 'Human review' : 'Upload supporting documents' });
-  }
+  if (status === 'COMPLETE') { const hasDocs = db.files.some(f => f.auditId === auditId); store.update('audits', auditId, { status: hasDocs ? 'Paid — documents received' : 'Paid — awaiting documents', salesStage: 'Paid audit', nextAction: hasDocs ? 'Human review' : 'Upload supporting documents' }); }
   res.sendStatus(200);
 });
 
 app.get('/api/admin', requireAdmin, (_, res) => {
-  const db = store.read();
-  const completed = db.payments.filter(p => String(p.status).toUpperCase() === 'COMPLETE');
-  const initiated = db.payments.filter(p => String(p.status).toUpperCase() === 'INITIATED');
-  const paidAuditIds = new Set(completed.map(p => p.auditId));
-  const filesByAudit = db.files.reduce((acc, f) => { acc[f.auditId] = (acc[f.auditId] || 0) + 1; return acc; }, {});
-  const paymentsByAudit = db.payments.reduce((acc, p) => { if (!acc[p.auditId] || new Date(p.createdAt || 0) > new Date(acc[p.auditId].createdAt || 0)) acc[p.auditId] = p; return acc; }, {});
-  const audits = db.audits.map(a => ({ ...cleanPublicAudit(a), documentCount: filesByAudit[a.id] || 0, paymentStatus: paymentsByAudit[a.id]?.status || 'Not started', paymentMode: paymentsByAudit[a.id]?.mode || paymentMode }));
-  res.json({
-    metrics: {
-      leads: db.audits.length,
-      paid: paidAuditIds.size,
-      revenue: completed.reduce((s,p) => s + Number(p.amount || 0), 0),
-      documents: db.files.length,
-      initiated: initiated.length,
-      conversion: db.audits.length ? Math.round((paidAuditIds.size / db.audits.length) * 100) : 0,
-      pipelineValue: db.audits.filter(a => !paidAuditIds.has(a.id)).length * 500
-    },
-    operations: { paymentConfigured, paymentMode, liveReady: paymentConfigured && paymentMode === 'live', appUrlConfigured: Boolean(process.env.APP_URL) },
-    audits,
-    payments: db.payments,
-    files: db.files.map(({ storedName, ...f }) => f)
-  });
+  const db = store.read(); const completed = db.payments.filter(p => String(p.status).toUpperCase() === 'COMPLETE'); const initiated = db.payments.filter(p => String(p.status).toUpperCase() === 'INITIATED'); const paidAuditIds = new Set(completed.map(p => p.auditId)); const filesByAudit = db.files.reduce((acc, f) => { acc[f.auditId] = (acc[f.auditId] || 0) + 1; return acc; }, {}); const paymentsByAudit = db.payments.reduce((acc, p) => { if (!acc[p.auditId] || new Date(p.createdAt || 0) > new Date(acc[p.auditId].createdAt || 0)) acc[p.auditId] = p; return acc; }, {}); const audits = db.audits.map(a => ({ ...cleanPublicAudit(a), documentCount: filesByAudit[a.id] || 0, paymentStatus: paymentsByAudit[a.id]?.status || 'Not started', paymentMode: paymentsByAudit[a.id]?.mode || paymentMode }));
+  res.json({ metrics: { leads: db.audits.length, paid: paidAuditIds.size, revenue: completed.reduce((s,p) => s + Number(p.amount || 0), 0), documents: db.files.length, initiated: initiated.length, conversion: db.audits.length ? Math.round((paidAuditIds.size / db.audits.length) * 100) : 0, pipelineValue: db.audits.filter(a => !paidAuditIds.has(a.id)).length * 500 }, operations: { paymentConfigured, paymentMode, liveReady: paymentConfigured && paymentMode === 'live', appUrlConfigured: Boolean(process.env.APP_URL) }, audits, payments: db.payments, files: db.files.map(({ storedName, ...f }) => f) });
 });
 
 app.patch('/api/admin/audits/:id', requireAdmin, (req, res) => {
-  const allowedPatch = {};
-  ['status','recommendation','score','band','salesStage','recommendedService','quoteAmount','nextAction'].forEach(k => { if (req.body[k] !== undefined) allowedPatch[k] = k === 'quoteAmount' ? Number(req.body[k] || 0) : normalise(req.body[k]); });
-  const audit = store.update('audits', req.params.id, allowedPatch);
-  if (!audit) return res.status(404).json({ error: 'Audit not found.' });
-  res.json({ audit: cleanPublicAudit(audit) });
+  const allowedPatch = {}; ['status','recommendation','score','band','salesStage','recommendedService','quoteAmount','nextAction'].forEach(k => { if (req.body[k] !== undefined) allowedPatch[k] = k === 'quoteAmount' ? Number(req.body[k] || 0) : normalise(req.body[k]); }); const audit = store.update('audits', req.params.id, allowedPatch); if (!audit) return res.status(404).json({ error: 'Audit not found.' }); res.json({ audit: cleanPublicAudit(audit) });
 });
 
-app.use((err, req, res, next) => {
-  if (err instanceof multer.MulterError) return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'A file exceeds the upload limit.' : err.message });
-  if (err) return res.status(400).json({ error: err.message || 'Request could not be completed.' });
-  next();
-});
+app.use((err, req, res, next) => { if (err instanceof multer.MulterError) return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'A file exceeds the upload limit.' : err.message }); if (err) return res.status(400).json({ error: err.message || 'Request could not be completed.' }); next(); });
 
 if (require.main === module) {
   const server = app.listen(port, () => console.log(`Growth Desk ready at http://localhost:${port} · PayFast ${paymentMode}`));
   const close = signal => { console.log(`${signal} received; closing cleanly.`); server.close(() => process.exit(0)); setTimeout(() => process.exit(1), 10_000).unref(); };
-  process.on('SIGTERM', () => close('SIGTERM'));
-  process.on('SIGINT', () => close('SIGINT'));
+  process.on('SIGTERM', () => close('SIGTERM')); process.on('SIGINT', () => close('SIGINT'));
 }
-
 module.exports = app;
