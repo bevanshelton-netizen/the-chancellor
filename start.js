@@ -7,6 +7,7 @@ require('./notification-routes')(app);
 require('./reputation-routes')(app);
 require('./outcome-routes')(app);
 require('./public-proof-routes')(app);
+require('./referral-routes')(app);
 const communications = require('./communications-routes')(app);
 
 const port = Number(process.env.PORT || 3000);
