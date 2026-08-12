@@ -21,7 +21,10 @@ localStorage.setItem(KEY,JSON.stringify(saved));
 const visitorId=id(),touch=saved.lastTouch||incoming;
 async function send(event,extra={}){try{await fetch('/api/acquisition/event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({visitorId,event,touch,...extra}),keepalive:true})}catch{}}
 async function linkAudit(){try{await fetch('/api/acquisition/link-audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({visitorId})})}catch{}}
-window.ChancellorAcquisition={visitorId,touch,track:send,linkAudit,firstTouch:saved.firstTouch};
+async function captureReferral(){if(!touch.referralCode)return;try{await fetch('/api/referrals/capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({referralCode:touch.referralCode})})}catch{}}
+async function linkReferral(leadType){try{await fetch('/api/referrals/link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({leadType})})}catch{}}
+window.ChancellorAcquisition={visitorId,touch,track:send,linkAudit,linkReferral,firstTouch:saved.firstTouch};
+captureReferral();
 const pageKey=`acq_page_${location.pathname}_${location.search}`;if(!sessionStorage.getItem(pageKey)){sessionStorage.setItem(pageKey,'1');send('page_view')}
 let chatTracked=false,auditTracked=false;
 function chat(){if(chatTracked)return;chatTracked=true;send('conversation_started',{label:'The Chancellor chat'})}
