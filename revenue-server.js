@@ -49,9 +49,8 @@ coreApp.get('/api/features', (_req, res) => {
 });
 
 // ---- Critical homepage rescue layer ---------------------------------------
-// Render can occasionally return the HTML while secondary CSS/image requests
-// are still failing. Serve the homepage as a self-contained response so the
-// brand, layout and approved Chancellor portrait do not depend on extra fetches.
+// The homepage remains visually complete even if secondary stylesheet requests
+// are delayed during a fresh deployment.
 function readText(name){
   try{return fs.readFileSync(path.join(__dirname,name),'utf8')}catch{return ''}
 }
@@ -62,7 +61,7 @@ function dataAsset(source,name){
 function buildHomepage(){
   let html=readText('index.html');
   if(!html)return '';
-  const css=[readText('styles.css'),readText('portrait.css'),readText('homepage-tweaks.css')].filter(Boolean).join('\n');
+  const css=[readText('styles.css'),readText('portrait.css'),readText('homepage-tweaks.css'),readText('launch-polish.css')].filter(Boolean).join('\n');
   const brands=readText('brand-assets.js');
   const portrait=dataAsset(brands,'portrait');
   const crest=dataAsset(brands,'crest');
@@ -92,6 +91,7 @@ const criticalAssets={
   '/styles.css':['styles.css','text/css; charset=utf-8'],
   '/portrait.css':['portrait.css','text/css; charset=utf-8'],
   '/homepage-tweaks.css':['homepage-tweaks.css','text/css; charset=utf-8'],
+  '/launch-polish.css':['launch-polish.css','text/css; charset=utf-8'],
   '/brand-assets.js':['brand-assets.js','application/javascript; charset=utf-8'],
   '/brand-repair.js':['brand-repair.js','application/javascript; charset=utf-8'],
   '/acquisition-client.js':['acquisition-client.js','application/javascript; charset=utf-8'],
