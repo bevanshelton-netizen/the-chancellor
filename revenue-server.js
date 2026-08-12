@@ -1,11 +1,14 @@
 require('dotenv').config({ path: require('node:path').join(__dirname, '.env') });
-const app = require('./server');
+const fs = require('node:fs');
+const path = require('node:path');
+const express = require('express');
+const coreApp = require('./server');
 
 const featureState = {};
 function loadFeature(name, file) {
   try {
     const register = require(file);
-    const result = typeof register === 'function' ? register(app) : null;
+    const result = typeof register === 'function' ? register(coreApp) : null;
     featureState[name] = { ok: true };
     console.log(`[feature] ${name}: ready`);
     return result || null;
@@ -40,10 +43,71 @@ loadFeature('referrals', './referral-routes');
 loadFeature('institutional-accounts', './institutional-routes');
 const communications = loadFeature('communications', './communications-routes');
 
-app.get('/api/features', (_req, res) => {
+coreApp.get('/api/features', (_req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.json({ ok: true, entrypoint: 'revenue-server.js', features: featureState });
 });
+
+// ---- Critical homepage rescue layer ---------------------------------------
+// Render can occasionally return the HTML while secondary CSS/image requests
+// are still failing. Serve the homepage as a self-contained response so the
+// brand, layout and approved Chancellor portrait do not depend on extra fetches.
+function readText(name){
+  try{return fs.readFileSync(path.join(__dirname,name),'utf8')}catch{return ''}
+}
+function dataAsset(source,name){
+  const re=new RegExp(`const ${name}='(data:image\\/webp;base64,[^']+)'`,'i');
+  return source.match(re)?.[1]||'';
+}
+function buildHomepage(){
+  let html=readText('index.html');
+  if(!html)return '';
+  const css=[readText('styles.css'),readText('portrait.css'),readText('homepage-tweaks.css')].filter(Boolean).join('\n');
+  const brands=readText('brand-assets.js');
+  const portrait=dataAsset(brands,'portrait');
+  const crest=dataAsset(brands,'crest');
+  if(css)html=html.replace('</head>',`<style data-critical-home>${css}</style></head>`);
+  if(portrait){
+    html=html.replace(/src="\/brand\/chancellor\.webp[^\"]*"/g,`src="${portrait}"`);
+    html=html.replace(/src="assets\/the-chancellor-approved\.svg[^\"]*"/g,`src="${portrait}"`);
+  }
+  if(crest){
+    html=html.replace(/src="\/brand\/crest\.jpg[^\"]*"/g,`src="${crest}"`);
+    html=html.replace(/src="assets\/the-chancellor-crest\.svg[^\"]*"/g,`src="${crest}"`);
+  }
+  return html;
+}
+
+const app=express();
+app.get('/',(_req,res)=>{
+  const html=buildHomepage();
+  if(!html)return res.status(500).type('text/plain').send('Homepage unavailable.');
+  res.setHeader('Cache-Control','no-store, max-age=0');
+  res.type('html').send(html);
+});
+
+// Explicitly serve the files needed for the top of the homepage before the
+// core static middleware, with correct MIME types and no stale cache.
+const criticalAssets={
+  '/styles.css':['styles.css','text/css; charset=utf-8'],
+  '/portrait.css':['portrait.css','text/css; charset=utf-8'],
+  '/homepage-tweaks.css':['homepage-tweaks.css','text/css; charset=utf-8'],
+  '/brand-assets.js':['brand-assets.js','application/javascript; charset=utf-8'],
+  '/brand-repair.js':['brand-repair.js','application/javascript; charset=utf-8'],
+  '/acquisition-client.js':['acquisition-client.js','application/javascript; charset=utf-8'],
+  '/app.js':['app.js','application/javascript; charset=utf-8']
+};
+for(const [route,[file,type]] of Object.entries(criticalAssets)){
+  app.get(route,(_req,res)=>{
+    const body=readText(file);
+    if(!body)return res.status(404).end();
+    res.setHeader('Content-Type',type);
+    res.setHeader('Cache-Control','no-store, max-age=0');
+    res.send(body);
+  });
+}
+app.use(coreApp);
+// -------------------------------------------------------------------------
 
 let scanFollowups = () => {};
 try { ({ scanFollowups } = require('./followup-engine')); }
