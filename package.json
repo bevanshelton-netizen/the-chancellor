@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node revenue-server.js",
     "dev": "node --watch revenue-server.js",
-    "test": "node tests/core.test.js"
+    "test": "node tests/core.test.js",
+    "deploy:check": "node deploy-check.js"
   },
   "engines": { "node": ">=20" },
   "dependencies": {
