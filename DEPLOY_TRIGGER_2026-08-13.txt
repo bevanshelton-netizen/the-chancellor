@@ -1,0 +1,4 @@
+Final Render deployment trigger
+Date: 2026-08-13
+Purpose: deploy the approved Chancellor portrait asset and sales-first R500 homepage from main.
+Approved portrait: /assets/chancellor-approved-live.webp
