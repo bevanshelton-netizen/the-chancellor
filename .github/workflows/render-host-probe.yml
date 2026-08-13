@@ -1,0 +1,36 @@
+name: Render Host Probe
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe known Render hostnames
+        shell: bash
+        run: |
+          set -u
+          for base in \
+            'https://the-chancellor.onrender.com' \
+            'https://the-chancellors-business-growth-desk.onrender.com'
+          do
+            echo "===== $base ====="
+            code=$(curl -L --connect-timeout 10 --max-time 20 -sS -o /tmp/home.html -w '%{http_code}' "$base/" || true)
+            echo "home_http=$code"
+            if [ -s /tmp/home.html ]; then
+              grep -o -m1 '<title>[^<]*</title>' /tmp/home.html || true
+              if grep -Fq 'Start the R500 Business Readiness Audit' /tmp/home.html; then echo 'r500_first=yes'; else echo 'r500_first=no'; fi
+              if grep -Fq '/assets/chancellor-approved-live.webp' /tmp/home.html; then echo 'approved_portrait_ref=yes'; else echo 'approved_portrait_ref=no'; fi
+            fi
+            hcode=$(curl -L --connect-timeout 10 --max-time 20 -sS -o /tmp/health.json -w '%{http_code}' "$base/api/health" || true)
+            echo "health_http=$hcode"
+            cat /tmp/health.json 2>/dev/null || true
+            echo
+          done
