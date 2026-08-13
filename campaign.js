@@ -1,5 +1,6 @@
 (()=>{
 const q=s=>document.querySelector(s),params=new URLSearchParams(location.search),focus=(params.get('focus')||params.get('campaign')||'growth').toLowerCase();
+document.querySelectorAll('.crest-logo').forEach(img=>{img.src='/assets/the-chancellor-crest.svg?v=20260813-crest-direct-3';});
 const variants={
   funding:{eyebrow:'Funding readiness starts before the application',headline:'Before you apply for funding, know what a funder will see.',lead:'Start with the R500 Business Readiness Audit to identify document, financial and positioning gaps before you spend time chasing the wrong funding opportunity.'},
   tender:{eyebrow:'Contract & tender readiness',headline:'Stop entering opportunities with gaps you could have fixed first.',lead:'Start with the R500 Business Readiness Audit to check capability, compliance, documents and evidence before deadline pressure starts.'},
