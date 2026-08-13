@@ -1,34 +1,29 @@
 (()=>{
-  const PORTRAIT='/the-chancellor.jpg?v=20260812-real-1';
-  const AVATAR='/the-chancellor-avatar.png?v=20260812-real-1';
+  const APPROVED='/assets/chancellor-approved-live.webp?v=20260813-approved-1';
 
-  function show(el,src){
+  function show(el){
     if(!el)return;
-    if(el.getAttribute('src')!==src)el.setAttribute('src',src);
+    if(el.getAttribute('src')!==APPROVED)el.setAttribute('src',APPROVED);
     el.style.visibility='visible';
     el.style.opacity='1';
-    el.dataset.brandReady='approved-real-photo';
+    el.dataset.brandReady='approved-chancellor-portrait';
   }
 
   function apply(){
-    document.querySelectorAll('.chancellor-portrait,.rescue-portrait').forEach(el=>show(el,PORTRAIT));
-    document.querySelectorAll('.avatar-img').forEach(el=>show(el,AVATAR));
+    document.querySelectorAll('.chancellor-portrait,.rescue-portrait,.avatar-img,.campaign-identity img').forEach(show);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});
   else apply();
   window.addEventListener('pageshow',()=>setTimeout(apply,25));
 
-  // Guard against any older cached brand script trying to swap the approved
-  // photograph for a generated likeness after this repair has run.
   const observer=new MutationObserver(mutations=>{
     for(const mutation of mutations){
       const el=mutation.target;
-      if(el.matches?.('.chancellor-portrait,.rescue-portrait')&&el.getAttribute('src')!==PORTRAIT)show(el,PORTRAIT);
-      if(el.matches?.('.avatar-img')&&el.getAttribute('src')!==AVATAR)show(el,AVATAR);
+      if(el.matches?.('.chancellor-portrait,.rescue-portrait,.avatar-img,.campaign-identity img')&&el.getAttribute('src')!==APPROVED)show(el);
     }
   });
-  const startObserver=()=>document.querySelectorAll('.chancellor-portrait,.rescue-portrait,.avatar-img').forEach(el=>observer.observe(el,{attributes:true,attributeFilter:['src']}));
+  const startObserver=()=>document.querySelectorAll('.chancellor-portrait,.rescue-portrait,.avatar-img,.campaign-identity img').forEach(el=>observer.observe(el,{attributes:true,attributeFilter:['src']}));
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',startObserver,{once:true});
   else startObserver();
 })();
