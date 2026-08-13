@@ -24,6 +24,7 @@ function loadFeature(name, file) {
 loadFeature('brand-fallbacks', './brand-fallback-routes');
 loadFeature('offers', './offer-routes');
 loadFeature('audit-quotations', './quote-routes');
+loadFeature('quote-followups', './quote-followup-routes');
 loadFeature('delivery', './delivery-routes');
 loadFeature('production', './production-routes');
 loadFeature('document-intelligence', './intelligence-routes');
