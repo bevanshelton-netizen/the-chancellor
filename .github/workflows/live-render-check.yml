@@ -1,0 +1,72 @@
+name: Live Render Verification
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Wait for Render and verify production
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://the-chancellor.onrender.com'
+          echo "Verifying $BASE"
+
+          ready=0
+          for i in $(seq 1 30); do
+            code=$(curl -L -sS -o /tmp/health.json -w '%{http_code}' "$BASE/api/health" || true)
+            echo "Attempt $i: health HTTP $code"
+            if [ "$code" = '200' ] && grep -q '"ok":true' /tmp/health.json; then
+              ready=1
+              break
+            fi
+            sleep 10
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo 'Render did not become healthy within the verification window.'
+            cat /tmp/health.json 2>/dev/null || true
+            exit 1
+          fi
+
+          check_page () {
+            path="$1"
+            needle="$2"
+            out="$3"
+            code=$(curl -L -sS -o "$out" -w '%{http_code}' "$BASE$path" || true)
+            echo "$path -> HTTP $code"
+            [ "$code" = '200' ]
+            grep -Fq "$needle" "$out"
+          }
+
+          check_asset () {
+            path="$1"
+            code=$(curl -L -sS -o /tmp/asset.bin -w '%{http_code}' "$BASE$path" || true)
+            bytes=$(wc -c < /tmp/asset.bin 2>/dev/null || echo 0)
+            echo "$path -> HTTP $code, $bytes bytes"
+            [ "$code" = '200' ]
+            [ "$bytes" -gt 1000 ]
+          }
+
+          check_page '/' 'Start the R500 Business Readiness Audit' /tmp/home.html
+          grep -Fq '/assets/chancellor-approved-live.webp' /tmp/home.html
+          grep -Fq '/brand/crest.jpg' /tmp/home.html
+
+          check_page '/campaign.html?focus=growth&utm_source=verification' 'R500 Business Readiness Audit' /tmp/campaign.html
+          grep -Fq '/assets/chancellor-approved-live.webp' /tmp/campaign.html
+          grep -Fq '/brand/crest.jpg' /tmp/campaign.html
+
+          check_page '/portal.html' 'Client' /tmp/portal.html
+          check_asset '/assets/chancellor-approved-live.webp?v=live-check'
+          check_asset '/brand/crest.jpg?v=live-check'
+
+          echo 'LIVE_RENDER_VERIFICATION=PASS'
+          echo 'Homepage, campaign, portal, health, portrait and crest all passed.'
