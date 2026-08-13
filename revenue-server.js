@@ -23,6 +23,7 @@ function loadFeature(name, file) {
 // Every commercial module is isolated so one optional feature cannot take down the public service.
 loadFeature('brand-fallbacks', './brand-fallback-routes');
 loadFeature('offers', './offer-routes');
+loadFeature('audit-quotations', './quote-routes');
 loadFeature('delivery', './delivery-routes');
 loadFeature('production', './production-routes');
 loadFeature('document-intelligence', './intelligence-routes');
