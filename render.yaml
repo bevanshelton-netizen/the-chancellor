@@ -6,7 +6,11 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/health
-    autoDeployTrigger: commit
+    autoDeployTrigger: checksPass
+    buildFilter:
+      ignoredPaths:
+        - .github/**
+        - "**/*.md"
     maxShutdownDelaySeconds: 30
     numInstances: 1
     disk:
