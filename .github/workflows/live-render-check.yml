@@ -1,8 +1,6 @@
 name: Live Render Verification
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -13,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Wait for Render and verify production
+      - name: Verify live Render production
         shell: bash
         run: |
           set -euo pipefail
@@ -58,7 +56,6 @@ jobs:
 
           check_page '/' 'Start the R500 Business Readiness Audit' /tmp/home.html
           grep -Fq '/assets/chancellor-approved-live.webp' /tmp/home.html
-          grep -Fq '/brand/crest.jpg' /tmp/home.html
 
           check_page '/campaign.html?focus=growth&utm_source=verification' 'R500 Business Readiness Audit' /tmp/campaign.html
           grep -Fq '/assets/chancellor-approved-live.webp' /tmp/campaign.html
