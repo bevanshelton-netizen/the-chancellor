@@ -1,11 +1,11 @@
 (()=>{
 const q=s=>document.querySelector(s),params=new URLSearchParams(location.search),focus=(params.get('focus')||params.get('campaign')||'growth').toLowerCase();
 const variants={
-  funding:{eyebrow:'Funding readiness starts before the application',headline:'Before you apply for funding, know what a funder will see.',lead:'The Chancellor helps you identify document, financial and positioning gaps before you spend time chasing the wrong funding opportunity.'},
-  tender:{eyebrow:'Contract & tender readiness',headline:'Stop entering opportunities with gaps you could have fixed first.',lead:'Check your capability, compliance, documents and evidence before the deadline pressure starts.'},
-  investor:{eyebrow:'Investor readiness',headline:'A good business still needs a credible investment story.',lead:'Clarify the opportunity, evidence, numbers, use of funds and investor narrative before you pitch.'},
-  startup:{eyebrow:'Start with structure, not noise',headline:'Turn the business idea into an organised next move.',lead:'Use The Chancellor to clarify the model, target customer, immediate risks and the first documents you actually need.'},
-  growth:{eyebrow:'Build. Position. Fund. Grow.',headline:'Find the next practical move for your business.',lead:'Talk to The Chancellor, identify the gap and move into a structured R500 Business Readiness Audit when you are ready.'}
+  funding:{eyebrow:'Funding readiness starts before the application',headline:'Before you apply for funding, know what a funder will see.',lead:'Start with the R500 Business Readiness Audit to identify document, financial and positioning gaps before you spend time chasing the wrong funding opportunity.'},
+  tender:{eyebrow:'Contract & tender readiness',headline:'Stop entering opportunities with gaps you could have fixed first.',lead:'Start with the R500 Business Readiness Audit to check capability, compliance, documents and evidence before deadline pressure starts.'},
+  investor:{eyebrow:'Investor readiness',headline:'A good business still needs a credible investment story.',lead:'Start with the R500 Business Readiness Audit to clarify the opportunity, evidence, numbers, use of funds and investor narrative before you pitch.'},
+  startup:{eyebrow:'Start with structure, not noise',headline:'Turn the business idea into an organised next move.',lead:'Start with the R500 Business Readiness Audit to clarify the model, target customer, immediate risks and the first business assets you actually need.'},
+  growth:{eyebrow:'Build. Position. Fund. Grow.',headline:'Find the next practical move for your business.',lead:'Start with the R500 Business Readiness Audit. We identify the gaps between your business and its next opportunity, then recommend the smallest sensible next move.'}
 };
 const v=variants[focus]||variants.growth;q('#campaignEyebrow').textContent=v.eyebrow;q('#campaignHeadline').textContent=v.headline;q('#campaignLead').textContent=v.lead;
 function carried(path){const p=new URLSearchParams(location.search);if(!p.get('utm_campaign'))p.set('utm_campaign',focus);if(!p.get('utm_source'))p.set('utm_source','campaign-page');if(!p.get('utm_medium'))p.set('utm_medium','landing-page');const [base,hash]=path.split('#');return `${base||'/'}?${p.toString()}${hash?`#${hash}`:''}`}
