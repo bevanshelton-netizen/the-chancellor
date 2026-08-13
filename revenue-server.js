@@ -27,6 +27,7 @@ loadFeature('delivery', './delivery-routes');
 loadFeature('production', './production-routes');
 loadFeature('document-intelligence', './intelligence-routes');
 loadFeature('exports', './export-routes');
+loadFeature('readiness-report', './readiness-report-routes');
 loadFeature('follow-ups', './followup-routes');
 loadFeature('acquisition', './acquisition-routes');
 loadFeature('activation', './activation-routes');
