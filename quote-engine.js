@@ -17,7 +17,7 @@ function buildQuoteSuggestion(audit={}){
   const extras=supporting.map(x=>x.service).filter(x=>x!==primary.service);
   const deliverables=[primary.scope,...supporting.map(x=>x.scope)].filter(Boolean).join(' ');
   const description=extras.length?`${primary.service}, with supporting attention to ${extras.join(' and ')} based on the Business Readiness Audit.`:`${primary.service}, recommended from the Business Readiness Audit.`;
-  return {code:primary.code,service:primary.service,amount:primary.amount,description,deliverables,primaryPriority:priorities[0]?.section||'Business Foundation',supportingPriorities:priorities.slice(1,3).map(p=>p.section),expiresInDays:7,humanReviewRequired:true};
+  return {code:primary.code,service:primary.service,amount:primary.amount,description,deliverables,primaryPriority:priorities[0]?.section||'Business Foundation',supportingPriorities:priorities.slice(1,3).map(p=>p.section),expiresInDays:14,humanReviewRequired:true};
 }
 
 module.exports={packages,buildQuoteSuggestion};
