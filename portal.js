@@ -1,5 +1,5 @@
 if(!document.querySelector('link[data-offer-styles]')){const l=document.createElement('link');l.rel='stylesheet';l.href='offers.css?v=20260811-1';l.dataset.offerStyles='1';document.head.appendChild(l)}
-const $=s=>document.querySelector(s); const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const $=s=>document.querySelector(s); const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR',maximumFractionDigits:0}).format(Number(n||0));
 const code=sessionStorage.getItem('newAccessCode'); if(code) $('#newCode').innerHTML=`Your new access code is <strong>${esc(code)}</strong>. Save it before signing in.`;
 const qs=new URLSearchParams(location.search);
