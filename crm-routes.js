@@ -5,150 +5,28 @@ const SOURCES = ['Warm network','Edu-Build','Izakhono Africa','UFCE-SA','Radio /
 const ACTIVITY_TYPES = ['approach','followup','conversation','proposal','close','payment','note'];
 const WARM_SOURCES = new Set(['Warm network','Edu-Build','Izakhono Africa','UFCE-SA','Radio / media','Referral']);
 
-function clean(value, max = 500) {
-  return String(value ?? '').trim().replace(/[\u0000-\u001F\u007F]/g, '').slice(0, max);
+function clean(value, max = 500) { return String(value ?? '').trim().replace(/[\u0000-\u001F\u007F]/g, '').slice(0, max); }
+function money(value) { const number = Number(value || 0); return Number.isFinite(number) && number >= 0 ? Math.round(number * 100) / 100 : 0; }
+function requireAdmin(req, res, next) { if (!req.session?.admin) return res.status(401).json({ error: 'Administrator sign-in required.' }); next(); }
+function todayKey(value = new Date()) { return new Date(value).toISOString().slice(0, 10); }
+function phoneDigits(value) { let digits = clean(value, 40).replace(/\D/g, ''); if (digits.startsWith('0')) digits = `27${digits.slice(1)}`; if (!digits.startsWith('27') && digits.length === 9) digits = `27${digits}`; return digits; }
+function whatsappLink(lead) { const digits = phoneDigits(lead.phone); if (!digits) return ''; const first = clean(lead.name, 80).split(' ')[0] || 'there'; const text = `Good day ${first}. I’m reaching out through The Chancellor’s Business Growth Desk. I’d like to understand the biggest challenge or opportunity in your business right now and see whether we can help you move it forward. What is the one business result you most want to achieve in the next 90 days?`; return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`; }
+function leadScore(lead) { let score = 0; if (WARM_SOURCES.has(lead.source)) score += 25; const stageWeight = { NEW: 8, CONTACTED: 16, REPLIED: 30, CONVERSATION: 45, 'AUDIT OFFERED': 55, PAID: 35, 'PROPOSAL SENT': 70, WON: 0, 'FOLLOW-UP': 38, LOST: 0 }; score += stageWeight[lead.stage] || 0; const value = money(lead.value); if (value >= 25000) score += 20; else if (value >= 10000) score += 15; else if (value >= 2500) score += 10; else if (value > 0) score += 5; const today = todayKey(); if (lead.followUpDate && lead.followUpDate <= today) score += 18; if (lead.need) score += 6; if (lead.phone) score += 5; return Math.min(100, score); }
+function nextBestAction(lead) { if (lead.stage === 'PROPOSAL SENT') return 'Make a serious closing attempt today. Ask directly if they are ready to start.'; if (lead.stage === 'AUDIT OFFERED') return 'Follow up on the R500 Business Readiness Audit and ask for payment/start confirmation.'; if (lead.stage === 'CONVERSATION') return 'Convert the diagnosis into a written quotation or proposal today.'; if (lead.stage === 'REPLIED') return 'Move this prospect into a genuine sales conversation by phone or voice note.'; if (lead.stage === 'FOLLOW-UP') return 'Follow up now with a specific decision question, not a courtesy check-in.'; if (lead.stage === 'CONTACTED') return 'Get a reply: ask one focused question about the biggest 90-day business priority.'; if (lead.stage === 'PAID') return 'Deliver quickly, identify the larger need, then prepare the next offer.'; if (lead.stage === 'NEW') return 'Make the first approach today, preferably by WhatsApp or a direct call.'; return clean(lead.nextAction, 300) || 'Review this lead and define the next commercial move.'; }
+function enrichLead(lead) { const score = leadScore(lead); return { ...lead, score, temperature: score >= 70 ? 'HOT' : score >= 45 ? 'WARM' : 'COOL', suggestedAction: nextBestAction(lead), whatsappUrl: whatsappLink(lead) }; }
+function buildTodayQueue(leads) { return leads.filter(lead => !['WON','LOST'].includes(lead.stage)).map(enrichLead).sort((a,b) => b.score - a.score || money(b.value) - money(a.value)).slice(0, 20); }
+function commercialSummary(db) { const quotes = db.crmQuotes || [], payments = db.crmQuotePayments || []; const quoted = quotes.filter(q=>q.status!=='CANCELLED').reduce((s,q)=>s+money(q.amount),0); const paid = payments.reduce((s,p)=>s+money(p.amount),0); const open = quotes.filter(q=>!['PAID','CANCELLED','EXPIRED'].includes(q.status)).length; return { quoted, paid, outstanding: Math.max(0, quoted-paid), openQuotes: open, paymentCount: payments.length }; }
+function summarise(db) { const day = todayKey(); const activities = Array.isArray(db.crmActivities) ? db.crmActivities : []; const todays = activities.filter(item => todayKey(item.createdAt) === day); const count = type => todays.filter(item => item.type === type).length; const cash = todays.filter(item => item.type === 'payment').reduce((sum, item) => sum + money(item.amount), 0); const leads = Array.isArray(db.crmLeads) ? db.crmLeads : []; const stageCounts = Object.fromEntries(STAGES.map(stage => [stage, leads.filter(lead => lead.stage === stage).length])); const pipelineValue = leads.filter(lead => !['WON','LOST'].includes(lead.stage)).reduce((sum, lead) => sum + money(lead.value), 0); const wonValue = leads.filter(lead => lead.stage === 'WON').reduce((sum, lead) => sum + money(lead.value), 0); return { date: day, targets: { approaches: 30, followups: 10, conversations: 5, proposals: 2, closes: 1 }, actual: { approaches: count('approach'), followups: count('followup'), conversations: count('conversation'), proposals: count('proposal'), closes: count('close'), payments: count('payment'), cash }, stageCounts, pipelineValue, wonValue, leadCount: leads.length, overdueFollowups: leads.filter(lead => lead.followUpDate && lead.followUpDate <= day && !['WON','LOST'].includes(lead.stage)).length, hotLeads: leads.map(enrichLead).filter(lead => lead.temperature === 'HOT' && !['WON','LOST'].includes(lead.stage)).length };
 }
-function money(value) {
-  const number = Number(value || 0);
-  return Number.isFinite(number) && number >= 0 ? Math.round(number * 100) / 100 : 0;
-}
-function requireAdmin(req, res, next) {
-  if (!req.session?.admin) return res.status(401).json({ error: 'Administrator sign-in required.' });
-  next();
-}
-function todayKey(value = new Date()) {
-  return new Date(value).toISOString().slice(0, 10);
-}
-function phoneDigits(value) {
-  let digits = clean(value, 40).replace(/\D/g, '');
-  if (digits.startsWith('0')) digits = `27${digits.slice(1)}`;
-  if (!digits.startsWith('27') && digits.length === 9) digits = `27${digits}`;
-  return digits;
-}
-function whatsappLink(lead) {
-  const digits = phoneDigits(lead.phone);
-  if (!digits) return '';
-  const first = clean(lead.name, 80).split(' ')[0] || 'there';
-  const text = `Good day ${first}. I’m reaching out through The Chancellor’s Business Growth Desk. I’d like to understand the biggest challenge or opportunity in your business right now and see whether we can help you move it forward. What is the one business result you most want to achieve in the next 90 days?`;
-  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
-}
-function leadScore(lead) {
-  let score = 0;
-  if (WARM_SOURCES.has(lead.source)) score += 25;
-  const stageWeight = { NEW: 8, CONTACTED: 16, REPLIED: 30, CONVERSATION: 45, 'AUDIT OFFERED': 55, PAID: 35, 'PROPOSAL SENT': 70, WON: 0, 'FOLLOW-UP': 38, LOST: 0 };
-  score += stageWeight[lead.stage] || 0;
-  const value = money(lead.value);
-  if (value >= 25000) score += 20;
-  else if (value >= 10000) score += 15;
-  else if (value >= 2500) score += 10;
-  else if (value > 0) score += 5;
-  const today = todayKey();
-  if (lead.followUpDate && lead.followUpDate <= today) score += 18;
-  if (lead.need) score += 6;
-  if (lead.phone) score += 5;
-  return Math.min(100, score);
-}
-function nextBestAction(lead) {
-  if (lead.stage === 'PROPOSAL SENT') return 'Make a serious closing attempt today. Ask directly if they are ready to start.';
-  if (lead.stage === 'AUDIT OFFERED') return 'Follow up on the R500 Business Readiness Audit and ask for payment/start confirmation.';
-  if (lead.stage === 'CONVERSATION') return 'Convert the diagnosis into a written quotation or proposal today.';
-  if (lead.stage === 'REPLIED') return 'Move this prospect into a genuine sales conversation by phone or voice note.';
-  if (lead.stage === 'FOLLOW-UP') return 'Follow up now with a specific decision question, not a courtesy check-in.';
-  if (lead.stage === 'CONTACTED') return 'Get a reply: ask one focused question about the biggest 90-day business priority.';
-  if (lead.stage === 'PAID') return 'Deliver quickly, identify the larger need, then prepare the next offer.';
-  if (lead.stage === 'NEW') return 'Make the first approach today, preferably by WhatsApp or a direct call.';
-  return clean(lead.nextAction, 300) || 'Review this lead and define the next commercial move.';
-}
-function enrichLead(lead) {
-  const score = leadScore(lead);
-  return { ...lead, score, temperature: score >= 70 ? 'HOT' : score >= 45 ? 'WARM' : 'COOL', suggestedAction: nextBestAction(lead), whatsappUrl: whatsappLink(lead) };
-}
-function buildTodayQueue(leads) {
-  const active = leads.filter(lead => !['WON','LOST'].includes(lead.stage)).map(enrichLead);
-  return active.sort((a,b) => b.score - a.score || money(b.value) - money(a.value)).slice(0, 20);
-}
-function summarise(db) {
-  const day = todayKey();
-  const activities = Array.isArray(db.crmActivities) ? db.crmActivities : [];
-  const todays = activities.filter(item => todayKey(item.createdAt) === day);
-  const count = type => todays.filter(item => item.type === type).length;
-  const cash = todays.filter(item => item.type === 'payment').reduce((sum, item) => sum + money(item.amount), 0);
-  const leads = Array.isArray(db.crmLeads) ? db.crmLeads : [];
-  const stageCounts = Object.fromEntries(STAGES.map(stage => [stage, leads.filter(lead => lead.stage === stage).length]));
-  const pipelineValue = leads.filter(lead => !['WON','LOST'].includes(lead.stage)).reduce((sum, lead) => sum + money(lead.value), 0);
-  const wonValue = leads.filter(lead => lead.stage === 'WON').reduce((sum, lead) => sum + money(lead.value), 0);
-  return {
-    date: day,
-    targets: { approaches: 30, followups: 10, conversations: 5, proposals: 2, closes: 1 },
-    actual: {
-      approaches: count('approach'), followups: count('followup'), conversations: count('conversation'), proposals: count('proposal'), closes: count('close'), payments: count('payment'), cash
-    },
-    stageCounts, pipelineValue, wonValue, leadCount: leads.length,
-    overdueFollowups: leads.filter(lead => lead.followUpDate && lead.followUpDate <= day && !['WON','LOST'].includes(lead.stage)).length,
-    hotLeads: leads.map(enrichLead).filter(lead => lead.temperature === 'HOT' && !['WON','LOST'].includes(lead.stage)).length
-  };
-}
-function endOfDayReport(db) {
-  const metrics = summarise(db);
-  const a = metrics.actual, t = metrics.targets;
-  return [
-    `THE CHANCELLOR — SALES COMMAND CENTRE`,
-    `Date: ${metrics.date}`,
-    `Approaches: ${a.approaches}/${t.approaches}`,
-    `Follow-ups: ${a.followups}/${t.followups}`,
-    `Sales conversations: ${a.conversations}/${t.conversations}`,
-    `Proposals: ${a.proposals}/${t.proposals}`,
-    `Closing attempts: ${a.closes}/${t.closes}`,
-    `Payments received: ${a.payments}`,
-    `Cash received today: R${money(a.cash).toFixed(2)}`,
-    `Open pipeline: R${money(metrics.pipelineValue).toFixed(2)}`,
-    `Hot leads: ${metrics.hotLeads}`,
-    `Overdue follow-ups: ${metrics.overdueFollowups}`
-  ].join('\n');
-}
+function endOfDayReport(db) { const metrics = summarise(db), c=commercialSummary(db), a=metrics.actual,t=metrics.targets; return [`THE CHANCELLOR — SALES COMMAND CENTRE`,`Date: ${metrics.date}`,`Approaches: ${a.approaches}/${t.approaches}`,`Follow-ups: ${a.followups}/${t.followups}`,`Sales conversations: ${a.conversations}/${t.conversations}`,`Proposals: ${a.proposals}/${t.proposals}`,`Closing attempts: ${a.closes}/${t.closes}`,`Payments received: ${a.payments}`,`Cash received today: R${money(a.cash).toFixed(2)}`,`Open pipeline: R${money(metrics.pipelineValue).toFixed(2)}`,`Quoted value: R${money(c.quoted).toFixed(2)}`,`Commercial payments: R${money(c.paid).toFixed(2)}`,`Outstanding quoted value: R${money(c.outstanding).toFixed(2)}`,`Hot leads: ${metrics.hotLeads}`,`Overdue follow-ups: ${metrics.overdueFollowups}`].join('\n'); }
+function quoteNumber(){return `BGD-${todayKey().replace(/-/g,'')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;}
 
 module.exports = function registerCrmRoutes(app) {
   app.get('/crm', (_req, res) => res.sendFile(require('node:path').join(__dirname, 'crm.html')));
-
-  app.get('/api/crm', requireAdmin, (_req, res) => {
-    const db = store.read();
-    const leads = Array.isArray(db.crmLeads) ? db.crmLeads : [];
-    const activities = Array.isArray(db.crmActivities) ? db.crmActivities : [];
-    res.setHeader('Cache-Control', 'no-store');
-    res.json({ ok: true, stages: STAGES, sources: SOURCES, metrics: summarise(db), leads: [...leads].reverse().map(enrichLead), todayQueue: buildTodayQueue(leads), endOfDayReport: endOfDayReport(db), activities: [...activities].reverse().slice(0, 200) });
-  });
-
-  app.post('/api/crm/leads', requireAdmin, (req, res) => {
-    const name = clean(req.body.name, 120);
-    const businessName = clean(req.body.businessName, 160);
-    if (!name && !businessName) return res.status(400).json({ error: 'Add a person or business name.' });
-    const stage = STAGES.includes(req.body.stage) ? req.body.stage : 'NEW';
-    const source = SOURCES.includes(req.body.source) ? req.body.source : 'Warm network';
-    const lead = store.insert('crmLeads', { name, businessName, phone: clean(req.body.phone, 50), email: clean(req.body.email, 160).toLowerCase(), source, category: clean(req.body.category, 100), need: clean(req.body.need, 600), stage, value: money(req.body.value), nextAction: clean(req.body.nextAction, 300), followUpDate: clean(req.body.followUpDate, 20), notes: clean(req.body.notes, 1200) });
-    res.status(201).json({ lead: enrichLead(lead), metrics: summarise(store.read()) });
-  });
-
-  app.patch('/api/crm/leads/:id', requireAdmin, (req, res) => {
-    const patch = {};
-    const fields = ['name','businessName','phone','email','category','need','nextAction','followUpDate','notes'];
-    for (const field of fields) if (field in req.body) patch[field] = clean(req.body[field], field === 'notes' ? 1200 : field === 'need' ? 600 : 300);
-    if ('stage' in req.body && STAGES.includes(req.body.stage)) patch.stage = req.body.stage;
-    if ('source' in req.body && SOURCES.includes(req.body.source)) patch.source = req.body.source;
-    if ('value' in req.body) patch.value = money(req.body.value);
-    const lead = store.update('crmLeads', req.params.id, patch);
-    if (!lead) return res.status(404).json({ error: 'Lead not found.' });
-    res.json({ lead: enrichLead(lead), metrics: summarise(store.read()) });
-  });
-
-  app.post('/api/crm/leads/:id/activity', requireAdmin, (req, res) => {
-    const db = store.read();
-    const lead = (db.crmLeads || []).find(item => item.id === req.params.id);
-    if (!lead) return res.status(404).json({ error: 'Lead not found.' });
-    const type = ACTIVITY_TYPES.includes(req.body.type) ? req.body.type : 'note';
-    const activity = store.insert('crmActivities', { leadId: lead.id, type, note: clean(req.body.note, 700), amount: type === 'payment' ? money(req.body.amount) : 0 });
-    const stageMap = { approach: 'CONTACTED', conversation: 'CONVERSATION', proposal: 'PROPOSAL SENT', payment: 'PAID' };
-    if (stageMap[type]) store.update('crmLeads', lead.id, { stage: stageMap[type] });
-    const updated = (store.read().crmLeads || []).find(item => item.id === lead.id);
-    res.status(201).json({ activity, lead: enrichLead(updated), metrics: summarise(store.read()) });
-  });
+  app.get('/api/crm', requireAdmin, (_req, res) => { const db = store.read(); const leads = db.crmLeads || [], activities = db.crmActivities || [], quotes=(db.crmQuotes||[]).slice().reverse(), payments=(db.crmQuotePayments||[]).slice().reverse(); res.setHeader('Cache-Control', 'no-store'); res.json({ ok: true, stages: STAGES, sources: SOURCES, metrics: summarise(db), commercial: commercialSummary(db), leads: [...leads].reverse().map(enrichLead), todayQueue: buildTodayQueue(leads), endOfDayReport: endOfDayReport(db), activities: [...activities].reverse().slice(0, 200), quotes: quotes.slice(0,100), quotePayments: payments.slice(0,200) }); });
+  app.post('/api/crm/leads', requireAdmin, (req, res) => { const name = clean(req.body.name,120), businessName=clean(req.body.businessName,160); if(!name&&!businessName)return res.status(400).json({error:'Add a person or business name.'}); const stage=STAGES.includes(req.body.stage)?req.body.stage:'NEW', source=SOURCES.includes(req.body.source)?req.body.source:'Warm network'; const lead=store.insert('crmLeads',{name,businessName,phone:clean(req.body.phone,50),email:clean(req.body.email,160).toLowerCase(),source,category:clean(req.body.category,100),need:clean(req.body.need,600),stage,value:money(req.body.value),nextAction:clean(req.body.nextAction,300),followUpDate:clean(req.body.followUpDate,20),notes:clean(req.body.notes,1200)}); res.status(201).json({lead:enrichLead(lead),metrics:summarise(store.read())}); });
+  app.patch('/api/crm/leads/:id', requireAdmin, (req, res) => { const patch={}; const fields=['name','businessName','phone','email','category','need','nextAction','followUpDate','notes']; for(const field of fields)if(field in req.body)patch[field]=clean(req.body[field],field==='notes'?1200:field==='need'?600:300); if('stage'in req.body&&STAGES.includes(req.body.stage))patch.stage=req.body.stage; if('source'in req.body&&SOURCES.includes(req.body.source))patch.source=req.body.source; if('value'in req.body)patch.value=money(req.body.value); const lead=store.update('crmLeads',req.params.id,patch); if(!lead)return res.status(404).json({error:'Lead not found.'}); res.json({lead:enrichLead(lead),metrics:summarise(store.read())}); });
+  app.post('/api/crm/leads/:id/activity', requireAdmin, (req, res) => { const db=store.read(), lead=(db.crmLeads||[]).find(item=>item.id===req.params.id); if(!lead)return res.status(404).json({error:'Lead not found.'}); const type=ACTIVITY_TYPES.includes(req.body.type)?req.body.type:'note'; const activity=store.insert('crmActivities',{leadId:lead.id,type,note:clean(req.body.note,700),amount:type==='payment'?money(req.body.amount):0}); const stageMap={approach:'CONTACTED',conversation:'CONVERSATION',proposal:'PROPOSAL SENT',payment:'PAID'}; if(stageMap[type])store.update('crmLeads',lead.id,{stage:stageMap[type]}); const updated=(store.read().crmLeads||[]).find(item=>item.id===lead.id); res.status(201).json({activity,lead:enrichLead(updated),metrics:summarise(store.read())}); });
+  app.post('/api/crm/leads/:id/quote', requireAdmin, (req,res)=>{ const db=store.read(),lead=(db.crmLeads||[]).find(x=>x.id===req.params.id); if(!lead)return res.status(404).json({error:'Lead not found.'}); const amount=money(req.body.amount),deposit=money(req.body.deposit); if(amount<=0)return res.status(400).json({error:'Quotation amount must be greater than zero.'}); const validity=Math.min(60,Math.max(1,Number(req.body.validityDays||7))); const quote=store.insert('crmQuotes',{quoteNumber:quoteNumber(),leadId:lead.id,businessName:lead.businessName||lead.name,contactName:lead.name,email:lead.email,phone:lead.phone,service:clean(req.body.service,180)||'Business Growth Desk professional service',description:clean(req.body.description,1000),amount,depositRequired:Math.min(amount,deposit),status:'SENT',expiresAt:new Date(Date.now()+validity*86400000).toISOString(),paidAmount:0}); store.insert('crmActivities',{leadId:lead.id,type:'proposal',note:`Quotation ${quote.quoteNumber} sent for R${amount.toFixed(2)}`,amount:0}); store.update('crmLeads',lead.id,{stage:'PROPOSAL SENT',value:amount,nextAction:deposit>0?`Collect deposit of R${Math.min(amount,deposit).toFixed(2)}`:'Make a serious closing attempt'}); res.status(201).json({quote,commercial:commercialSummary(store.read())}); });
+  app.post('/api/crm/quotes/:id/payment', requireAdmin, (req,res)=>{ let db=store.read(); const quote=(db.crmQuotes||[]).find(q=>q.id===req.params.id); if(!quote)return res.status(404).json({error:'Quotation not found.'}); const amount=money(req.body.amount); if(amount<=0)return res.status(400).json({error:'Payment amount must be greater than zero.'}); const current=(db.crmQuotePayments||[]).filter(p=>p.quoteId===quote.id).reduce((s,p)=>s+money(p.amount),0); const remaining=Math.max(0,money(quote.amount)-current); if(amount>remaining+0.01)return res.status(400).json({error:`Payment exceeds outstanding balance of R${remaining.toFixed(2)}.`}); const payment=store.insert('crmQuotePayments',{quoteId:quote.id,leadId:quote.leadId,amount,method:clean(req.body.method,80)||'Manual',reference:clean(req.body.reference,160),note:clean(req.body.note,400)}); db=store.read(); const paid=(db.crmQuotePayments||[]).filter(p=>p.quoteId===quote.id).reduce((s,p)=>s+money(p.amount),0); const status=paid+0.01>=money(quote.amount)?'PAID':'PART-PAID'; store.update('crmQuotes',quote.id,{paidAmount:paid,status,paidAt:status==='PAID'?new Date().toISOString():null}); store.insert('crmActivities',{leadId:quote.leadId,type:'payment',note:`Payment received against ${quote.quoteNumber}${payment.reference?` · ${payment.reference}`:''}`,amount}); store.update('crmLeads',quote.leadId,{stage:status==='PAID'?'WON':'PAID',nextAction:status==='PAID'?'Begin delivery and identify next opportunity':`Collect outstanding R${Math.max(0,money(quote.amount)-paid).toFixed(2)}`}); res.status(201).json({payment,quote:(store.read().crmQuotes||[]).find(q=>q.id===quote.id),commercial:commercialSummary(store.read())}); });
 };
