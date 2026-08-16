@@ -14,7 +14,7 @@
         <h1>Sales Command Centre</h1>
         <p>30 approaches · 10 follow-ups · 5 conversations · 2 proposals · 1 close</p>
       </div>
-      <div class="actions"><button id="refreshBtn" class="ghost">Refresh</button><button id="logoutBtn" class="ghost">Sign out</button></div>
+      <div class="actions"><button id="copyReportBtn" class="ghost">Copy EOD report</button><button id="refreshBtn" class="ghost">Refresh</button><button id="logoutBtn" class="ghost">Sign out</button></div>
     </header>
 
     <section id="loginPanel" class="panel login hidden">
@@ -37,6 +37,11 @@
     <main id="crmApp" class="hidden">
       <section class="scoreboard" id="scoreboard"></section>
 
+      <section class="panel today-panel">
+        <div class="section-head"><div><span class="eyebrow">TODAY QUEUE</span><h2>Do these next</h2><p class="sub">Automatically prioritised by relationship warmth, sales stage, urgency and deal value.</p></div><div class="queue-summary" id="queueSummary"></div></div>
+        <div id="todayQueue" class="today-queue"></div>
+      </section>
+
       <section class="panel quick-add">
         <div class="section-head"><div><span class="eyebrow">PIPELINE</span><h2>Add a lead</h2></div><button id="toggleLeadForm" class="ghost">Show / hide</button></div>
         <form id="leadForm" class="lead-form hidden">
@@ -58,7 +63,7 @@
         <div class="section-head"><div><span class="eyebrow">LIVE PIPELINE</span><h2>Prospects</h2></div><input id="searchInput" class="search" placeholder="Search leads..." /></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Lead</th><th>Source</th><th>Stage</th><th>Value</th><th>Next action</th><th>Follow-up</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Lead</th><th>Score</th><th>Source</th><th>Stage</th><th>Value</th><th>Next action</th><th>Follow-up</th><th>Actions</th></tr></thead>
             <tbody id="leadRows"></tbody>
           </table>
         </div>
