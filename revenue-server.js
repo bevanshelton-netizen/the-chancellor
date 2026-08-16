@@ -45,6 +45,7 @@ loadFeature('public-proof', './public-proof-routes');
 loadFeature('referrals', './referral-routes');
 loadFeature('institutional-accounts', './institutional-routes');
 loadFeature('crm', './crm-routes');
+loadFeature('crm-public-quotes', './crm-public-quote-routes');
 loadFeature('admin-recovery', './admin-recovery-routes');
 const communications = loadFeature('communications', './communications-routes');
 
