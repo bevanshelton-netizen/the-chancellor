@@ -19,8 +19,6 @@ function loadFeature(name, file) {
   }
 }
 
-// Core website, audit, client auth, R500 checkout and Rescue core are provided by ./server.
-// Every commercial module is isolated so one optional feature cannot take down the public service.
 loadFeature('brand-fallbacks', './brand-fallback-routes');
 loadFeature('offers', './offer-routes');
 loadFeature('audit-quotations', './quote-routes');
@@ -47,6 +45,7 @@ loadFeature('institutional-accounts', './institutional-routes');
 loadFeature('crm', './crm-routes');
 loadFeature('crm-public-quotes', './crm-public-quote-routes');
 loadFeature('crm-commercial-documents', './crm-commercial-doc-routes');
+const crmQuoteFollowups = loadFeature('crm-quote-followups', './crm-quote-followup-routes');
 loadFeature('admin-recovery', './admin-recovery-routes');
 const communications = loadFeature('communications', './communications-routes');
 
@@ -115,15 +114,19 @@ try { ({ scanFollowups } = require('./followup-engine')); }
 catch (error) { console.error(`[feature] follow-up scanner: disabled — ${String(error.message || error).slice(0, 240)}`); }
 
 const runCommunications = () => communications?.scan ? communications.scan().catch(error => console.error('Communications scan failed:', error.message)) : Promise.resolve();
+const runCrmQuoteFollowups = () => crmQuoteFollowups?.scan ? crmQuoteFollowups.scan().catch(error => console.error('CRM quotation follow-up scan failed:', error.message)) : Promise.resolve();
 const port = Number(process.env.PORT || 3000);
 const server = app.listen(port, () => {
   console.log(`The Chancellor complete v1 ready at http://localhost:${port}`);
   try { scanFollowups(); } catch (error) { console.error('Initial follow-up scan failed:', error.message); }
   setTimeout(runCommunications, 1000).unref();
+  setTimeout(runCrmQuoteFollowups, 1500).unref();
 });
 
 const followupInterval = setInterval(() => { try { scanFollowups(); } catch (error) { console.error('Scheduled follow-up scan failed:', error.message); } }, 15 * 60 * 1000);
 followupInterval.unref();
+const crmQuoteFollowupInterval=setInterval(runCrmQuoteFollowups,15*60*1000);
+crmQuoteFollowupInterval.unref();
 const communicationsIntervalMs=Math.max(15*60*1000,Number(process.env.COMMS_SCAN_INTERVAL_MINUTES||30)*60*1000);
 const communicationsInterval=setInterval(runCommunications,communicationsIntervalMs);
 communicationsInterval.unref();
@@ -131,6 +134,7 @@ communicationsInterval.unref();
 function close(signal) {
   console.log(`${signal} received; closing cleanly.`);
   clearInterval(followupInterval);
+  clearInterval(crmQuoteFollowupInterval);
   clearInterval(communicationsInterval);
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 10000).unref();
