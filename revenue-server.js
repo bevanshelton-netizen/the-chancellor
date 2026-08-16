@@ -46,6 +46,7 @@ loadFeature('referrals', './referral-routes');
 loadFeature('institutional-accounts', './institutional-routes');
 loadFeature('crm', './crm-routes');
 loadFeature('crm-public-quotes', './crm-public-quote-routes');
+loadFeature('crm-commercial-documents', './crm-commercial-doc-routes');
 loadFeature('admin-recovery', './admin-recovery-routes');
 const communications = loadFeature('communications', './communications-routes');
 
@@ -54,9 +55,6 @@ coreApp.get('/api/features', (_req, res) => {
   res.json({ ok: true, entrypoint: 'revenue-server.js', features: featureState });
 });
 
-// ---- Critical homepage rescue layer ---------------------------------------
-// The homepage remains visually complete even if secondary stylesheet requests
-// are delayed during a fresh deployment.
 function readText(name){
   try{return fs.readFileSync(path.join(__dirname,name),'utf8')}catch{return ''}
 }
@@ -91,8 +89,6 @@ app.get('/',(_req,res)=>{
   res.type('html').send(html);
 });
 
-// Explicitly serve the files needed for the top of the homepage before the
-// core static middleware, with correct MIME types and no stale cache.
 const criticalAssets={
   '/styles.css':['styles.css','text/css; charset=utf-8'],
   '/portrait.css':['portrait.css','text/css; charset=utf-8'],
@@ -113,7 +109,6 @@ for(const [route,[file,type]] of Object.entries(criticalAssets)){
   });
 }
 app.use(coreApp);
-// -------------------------------------------------------------------------
 
 let scanFollowups = () => {};
 try { ({ scanFollowups } = require('./followup-engine')); }
