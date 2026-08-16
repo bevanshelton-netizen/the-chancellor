@@ -3,6 +3,7 @@ const store = require('./store');
 const STAGES = ['NEW','CONTACTED','REPLIED','CONVERSATION','AUDIT OFFERED','PAID','PROPOSAL SENT','WON','FOLLOW-UP','LOST'];
 const SOURCES = ['Warm network','Edu-Build','Izakhono Africa','UFCE-SA','Radio / media','Referral','WhatsApp','LinkedIn','Facebook','Website','Cold outreach','Other'];
 const ACTIVITY_TYPES = ['approach','followup','conversation','proposal','close','payment','note'];
+const WARM_SOURCES = new Set(['Warm network','Edu-Build','Izakhono Africa','UFCE-SA','Radio / media','Referral']);
 
 function clean(value, max = 500) {
   return String(value ?? '').trim().replace(/[\u0000-\u001F\u007F]/g, '').slice(0, max);
@@ -18,6 +19,54 @@ function requireAdmin(req, res, next) {
 function todayKey(value = new Date()) {
   return new Date(value).toISOString().slice(0, 10);
 }
+function phoneDigits(value) {
+  let digits = clean(value, 40).replace(/\D/g, '');
+  if (digits.startsWith('0')) digits = `27${digits.slice(1)}`;
+  if (!digits.startsWith('27') && digits.length === 9) digits = `27${digits}`;
+  return digits;
+}
+function whatsappLink(lead) {
+  const digits = phoneDigits(lead.phone);
+  if (!digits) return '';
+  const first = clean(lead.name, 80).split(' ')[0] || 'there';
+  const text = `Good day ${first}. I’m reaching out through The Chancellor’s Business Growth Desk. I’d like to understand the biggest challenge or opportunity in your business right now and see whether we can help you move it forward. What is the one business result you most want to achieve in the next 90 days?`;
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+}
+function leadScore(lead) {
+  let score = 0;
+  if (WARM_SOURCES.has(lead.source)) score += 25;
+  const stageWeight = { NEW: 8, CONTACTED: 16, REPLIED: 30, CONVERSATION: 45, 'AUDIT OFFERED': 55, PAID: 35, 'PROPOSAL SENT': 70, WON: 0, 'FOLLOW-UP': 38, LOST: 0 };
+  score += stageWeight[lead.stage] || 0;
+  const value = money(lead.value);
+  if (value >= 25000) score += 20;
+  else if (value >= 10000) score += 15;
+  else if (value >= 2500) score += 10;
+  else if (value > 0) score += 5;
+  const today = todayKey();
+  if (lead.followUpDate && lead.followUpDate <= today) score += 18;
+  if (lead.need) score += 6;
+  if (lead.phone) score += 5;
+  return Math.min(100, score);
+}
+function nextBestAction(lead) {
+  if (lead.stage === 'PROPOSAL SENT') return 'Make a serious closing attempt today. Ask directly if they are ready to start.';
+  if (lead.stage === 'AUDIT OFFERED') return 'Follow up on the R500 Business Readiness Audit and ask for payment/start confirmation.';
+  if (lead.stage === 'CONVERSATION') return 'Convert the diagnosis into a written quotation or proposal today.';
+  if (lead.stage === 'REPLIED') return 'Move this prospect into a genuine sales conversation by phone or voice note.';
+  if (lead.stage === 'FOLLOW-UP') return 'Follow up now with a specific decision question, not a courtesy check-in.';
+  if (lead.stage === 'CONTACTED') return 'Get a reply: ask one focused question about the biggest 90-day business priority.';
+  if (lead.stage === 'PAID') return 'Deliver quickly, identify the larger need, then prepare the next offer.';
+  if (lead.stage === 'NEW') return 'Make the first approach today, preferably by WhatsApp or a direct call.';
+  return clean(lead.nextAction, 300) || 'Review this lead and define the next commercial move.';
+}
+function enrichLead(lead) {
+  const score = leadScore(lead);
+  return { ...lead, score, temperature: score >= 70 ? 'HOT' : score >= 45 ? 'WARM' : 'COOL', suggestedAction: nextBestAction(lead), whatsappUrl: whatsappLink(lead) };
+}
+function buildTodayQueue(leads) {
+  const active = leads.filter(lead => !['WON','LOST'].includes(lead.stage)).map(enrichLead);
+  return active.sort((a,b) => b.score - a.score || money(b.value) - money(a.value)).slice(0, 20);
+}
 function summarise(db) {
   const day = todayKey();
   const activities = Array.isArray(db.crmActivities) ? db.crmActivities : [];
@@ -32,19 +81,30 @@ function summarise(db) {
     date: day,
     targets: { approaches: 30, followups: 10, conversations: 5, proposals: 2, closes: 1 },
     actual: {
-      approaches: count('approach'),
-      followups: count('followup'),
-      conversations: count('conversation'),
-      proposals: count('proposal'),
-      closes: count('close'),
-      payments: count('payment'),
-      cash
+      approaches: count('approach'), followups: count('followup'), conversations: count('conversation'), proposals: count('proposal'), closes: count('close'), payments: count('payment'), cash
     },
-    stageCounts,
-    pipelineValue,
-    wonValue,
-    leadCount: leads.length
+    stageCounts, pipelineValue, wonValue, leadCount: leads.length,
+    overdueFollowups: leads.filter(lead => lead.followUpDate && lead.followUpDate <= day && !['WON','LOST'].includes(lead.stage)).length,
+    hotLeads: leads.map(enrichLead).filter(lead => lead.temperature === 'HOT' && !['WON','LOST'].includes(lead.stage)).length
   };
+}
+function endOfDayReport(db) {
+  const metrics = summarise(db);
+  const a = metrics.actual, t = metrics.targets;
+  return [
+    `THE CHANCELLOR — SALES COMMAND CENTRE`,
+    `Date: ${metrics.date}`,
+    `Approaches: ${a.approaches}/${t.approaches}`,
+    `Follow-ups: ${a.followups}/${t.followups}`,
+    `Sales conversations: ${a.conversations}/${t.conversations}`,
+    `Proposals: ${a.proposals}/${t.proposals}`,
+    `Closing attempts: ${a.closes}/${t.closes}`,
+    `Payments received: ${a.payments}`,
+    `Cash received today: R${money(a.cash).toFixed(2)}`,
+    `Open pipeline: R${money(metrics.pipelineValue).toFixed(2)}`,
+    `Hot leads: ${metrics.hotLeads}`,
+    `Overdue follow-ups: ${metrics.overdueFollowups}`
+  ].join('\n');
 }
 
 module.exports = function registerCrmRoutes(app) {
@@ -55,7 +115,7 @@ module.exports = function registerCrmRoutes(app) {
     const leads = Array.isArray(db.crmLeads) ? db.crmLeads : [];
     const activities = Array.isArray(db.crmActivities) ? db.crmActivities : [];
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ ok: true, stages: STAGES, sources: SOURCES, metrics: summarise(db), leads: [...leads].reverse(), activities: [...activities].reverse().slice(0, 200) });
+    res.json({ ok: true, stages: STAGES, sources: SOURCES, metrics: summarise(db), leads: [...leads].reverse().map(enrichLead), todayQueue: buildTodayQueue(leads), endOfDayReport: endOfDayReport(db), activities: [...activities].reverse().slice(0, 200) });
   });
 
   app.post('/api/crm/leads', requireAdmin, (req, res) => {
@@ -64,21 +124,8 @@ module.exports = function registerCrmRoutes(app) {
     if (!name && !businessName) return res.status(400).json({ error: 'Add a person or business name.' });
     const stage = STAGES.includes(req.body.stage) ? req.body.stage : 'NEW';
     const source = SOURCES.includes(req.body.source) ? req.body.source : 'Warm network';
-    const lead = store.insert('crmLeads', {
-      name,
-      businessName,
-      phone: clean(req.body.phone, 50),
-      email: clean(req.body.email, 160).toLowerCase(),
-      source,
-      category: clean(req.body.category, 100),
-      need: clean(req.body.need, 600),
-      stage,
-      value: money(req.body.value),
-      nextAction: clean(req.body.nextAction, 300),
-      followUpDate: clean(req.body.followUpDate, 20),
-      notes: clean(req.body.notes, 1200)
-    });
-    res.status(201).json({ lead, metrics: summarise(store.read()) });
+    const lead = store.insert('crmLeads', { name, businessName, phone: clean(req.body.phone, 50), email: clean(req.body.email, 160).toLowerCase(), source, category: clean(req.body.category, 100), need: clean(req.body.need, 600), stage, value: money(req.body.value), nextAction: clean(req.body.nextAction, 300), followUpDate: clean(req.body.followUpDate, 20), notes: clean(req.body.notes, 1200) });
+    res.status(201).json({ lead: enrichLead(lead), metrics: summarise(store.read()) });
   });
 
   app.patch('/api/crm/leads/:id', requireAdmin, (req, res) => {
@@ -90,7 +137,7 @@ module.exports = function registerCrmRoutes(app) {
     if ('value' in req.body) patch.value = money(req.body.value);
     const lead = store.update('crmLeads', req.params.id, patch);
     if (!lead) return res.status(404).json({ error: 'Lead not found.' });
-    res.json({ lead, metrics: summarise(store.read()) });
+    res.json({ lead: enrichLead(lead), metrics: summarise(store.read()) });
   });
 
   app.post('/api/crm/leads/:id/activity', requireAdmin, (req, res) => {
@@ -98,14 +145,10 @@ module.exports = function registerCrmRoutes(app) {
     const lead = (db.crmLeads || []).find(item => item.id === req.params.id);
     if (!lead) return res.status(404).json({ error: 'Lead not found.' });
     const type = ACTIVITY_TYPES.includes(req.body.type) ? req.body.type : 'note';
-    const activity = store.insert('crmActivities', {
-      leadId: lead.id,
-      type,
-      note: clean(req.body.note, 700),
-      amount: type === 'payment' ? money(req.body.amount) : 0
-    });
+    const activity = store.insert('crmActivities', { leadId: lead.id, type, note: clean(req.body.note, 700), amount: type === 'payment' ? money(req.body.amount) : 0 });
     const stageMap = { approach: 'CONTACTED', conversation: 'CONVERSATION', proposal: 'PROPOSAL SENT', payment: 'PAID' };
     if (stageMap[type]) store.update('crmLeads', lead.id, { stage: stageMap[type] });
-    res.status(201).json({ activity, lead: (store.read().crmLeads || []).find(item => item.id === lead.id), metrics: summarise(store.read()) });
+    const updated = (store.read().crmLeads || []).find(item => item.id === lead.id);
+    res.status(201).json({ activity, lead: enrichLead(updated), metrics: summarise(store.read()) });
   });
 };
