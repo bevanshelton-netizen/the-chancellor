@@ -25,6 +25,12 @@
         <button type="submit">Sign in</button>
         <button id="forgotPasswordBtn" type="button" class="ghost">Forgot password?</button>
       </form>
+      <div id="recoveryCodePanel" class="hidden" style="margin-top:18px">
+        <div class="eyebrow">ONE-TIME RECOVERY CODE</div>
+        <p class="sub">Open your Render service Logs, search for <strong>ADMIN RECOVERY CODE</strong>, then enter the 8-character code below.</p>
+        <input id="recoveryCode" inputmode="text" autocomplete="one-time-code" maxlength="9" placeholder="Recovery code" />
+        <button id="verifyRecoveryCodeBtn" type="button">Restore administrator access</button>
+      </div>
       <div id="loginMessage" class="message"></div>
     </section>
 
