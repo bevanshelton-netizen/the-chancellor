@@ -29,6 +29,13 @@ function renderReadiness(audit={}){
   const seen=new Set();const services=priorities.map(p=>({section:p.section,detail:serviceMap[p.section]})).filter(x=>x.detail&&!seen.has(x.detail[0])&&seen.add(x.detail[0]));
   $('#recommendedServices').innerHTML=services.length?services.map(({section,detail})=>`<article><small>${esc(section)}</small><strong>${esc(detail[0])}</strong><p>${esc(detail[1])}</p></article>`).join(''):'<p class="muted">Recommended follow-on services will appear here after scoring.</p>';
 }
+function renderLockedReadiness(audit={}){
+  $('#readinessPercent').textContent=`${Number(audit.readinessPercent||0)}%`;
+  const badge=$('#readinessBadge');badge.textContent=audit.band||'Readiness scored';badge.className=`readiness-badge ${bandClass(audit.band)}`;
+  $('#sectionScores').innerHTML='<article class="readiness-item"><div><strong>Your 9-category scorecard is ready</strong></div><small>Complete the R500 payment to unlock every category score and readiness bar.</small></article>';
+  $('#priorityAreas').innerHTML='<article><span>01</span><div><strong>Your Top 3 priorities are ready</strong><small>Unlock the three areas that need attention first.</small></div></article>';
+  $('#recommendedServices').innerHTML='<article><small>PAID REPORT</small><strong>Your recommended next services are ready</strong><p>Complete the R500 audit payment to unlock the detailed diagnosis, recommendations and downloadable report.</p></article>';
+}
 
 async function loadOffers(){
   const r=await fetch('/api/client/offers'); if(!r.ok)return null;
@@ -42,7 +49,29 @@ async function loadOffers(){
   return d;
 }
 
-async function load(){ const r=await fetch('/api/portal'); if(!r.ok)return null; const d=await r.json(); $('#login').classList.add('hidden'); $('#dashboard').classList.remove('hidden'); $('#businessName').textContent=d.audit.businessName; $('#clientGoal').textContent=d.audit.goal; $('#score').textContent=d.audit.score; $('#band').textContent=d.audit.band; $('#status').textContent=d.audit.status; $('#recommendation').textContent=d.audit.recommendation; $('#fileCount').textContent=d.files.length; renderReadiness(d.audit); $('#files').innerHTML=d.files.length?d.files.map(f=>`<div class="file-row"><span>${esc(f.originalName)}<small> · ${(f.size/1024).toFixed(0)} KB</small></span><span class="badge">${esc(f.status)}</span></div>`).join(''):'<p>No documents uploaded yet.</p>'; const paid=paymentComplete(d.payments); const pay=$('#payButton'),payStatus=$('#payStatus'),next=$('#nextStep'),reportButton=$('#downloadReadinessReport'),reportHint=$('#reportDownloadHint'); if(paid){pay.disabled=true;pay.textContent='Payment received ✓';payStatus.textContent='Your R500 audit payment is confirmed. Your Growth Desk can now proceed with review.';payStatus.className='status';next.textContent=clientNextStep(d.audit,d.files.length);reportButton?.classList.remove('hidden');if(reportHint)reportHint.textContent='Your paid Business Readiness Report is ready to download.'}else{pay.disabled=false;pay.textContent='Pay R500 & start my review';next.textContent='Secure payment';reportButton?.classList.add('hidden');if(reportHint)reportHint.textContent='Complete the R500 audit payment to unlock your downloadable report.';if(qs.get('payment')==='returned')payStatus.textContent='You have returned from PayFast. We are confirming your payment automatically…';if(qs.get('payment')==='cancelled'){payStatus.textContent='Payment was not completed. You can try again when ready.';payStatus.className='status error'}} await loadOffers(); return d; }
+async function load(){
+  const r=await fetch('/api/portal'); if(!r.ok)return null; const d=await r.json();
+  $('#login').classList.add('hidden'); $('#dashboard').classList.remove('hidden');
+  $('#businessName').textContent=d.audit.businessName; $('#clientGoal').textContent=d.audit.goal; $('#score').textContent=d.audit.score; $('#band').textContent=d.audit.band; $('#status').textContent=d.audit.status; $('#fileCount').textContent=d.files.length;
+  const paid=paymentComplete(d.payments); const pay=$('#payButton'),payStatus=$('#payStatus'),next=$('#nextStep'),reportButton=$('#downloadReadinessReport'),reportHint=$('#reportDownloadHint'),uploadForm=$('#uploadForm');
+  if(paid){
+    renderReadiness(d.audit);
+    $('#recommendation').textContent=d.audit.recommendation;
+    pay.disabled=true;pay.textContent='Payment received ✓';payStatus.textContent='Your R500 audit payment is confirmed. Your Growth Desk can now proceed with review.';payStatus.className='status';next.textContent=clientNextStep(d.audit,d.files.length);reportButton?.classList.remove('hidden');if(reportHint)reportHint.textContent='Your paid Business Readiness Report is ready to download.';
+    if(uploadForm){uploadForm.querySelectorAll('input,button').forEach(el=>el.disabled=false)}
+    await loadOffers();
+  }else{
+    renderLockedReadiness(d.audit);
+    $('#recommendation').textContent='Your detailed Chancellor recommendation is ready. Complete the R500 audit payment to unlock it.';
+    pay.disabled=false;pay.textContent='Pay R500 & start my review';next.textContent='Secure payment';reportButton?.classList.add('hidden');if(reportHint)reportHint.textContent='Complete the R500 audit payment to unlock your detailed report and recommendations.';
+    if(uploadForm){uploadForm.querySelectorAll('input,button').forEach(el=>el.disabled=true);const st=$('#uploadStatus');if(st){st.textContent='Document upload unlocks after the R500 audit payment is confirmed.';st.className='status'}}
+    $('#offers').innerHTML='<p class="muted">Your follow-on service options will appear after the paid audit review.</p>';
+    if(qs.get('payment')==='returned')payStatus.textContent='You have returned from PayFast. We are confirming your payment automatically…';
+    if(qs.get('payment')==='cancelled'){payStatus.textContent='Payment was not completed. You can try again when ready.';payStatus.className='status error'}
+  }
+  $('#files').innerHTML=d.files.length?d.files.map(f=>`<div class="file-row"><span>${esc(f.originalName)}<small> · ${(f.size/1024).toFixed(0)} KB</small></span><span class="badge">${esc(f.status)}</span></div>`).join(''):'<p>No documents uploaded yet.</p>';
+  return d;
+}
 $('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const st=$('#loginStatus');st.textContent='Signing in…';const r=await fetch('/api/auth/client',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget)))});const d=await r.json();if(!r.ok){st.textContent=d.error;st.className='status error';return}sessionStorage.removeItem('newAccessCode');load()});
 $('#uploadForm').addEventListener('submit',async e=>{e.preventDefault();const st=$('#uploadStatus'),button=e.currentTarget.querySelector('button');st.textContent='Uploading securely…';button.disabled=true;const r=await fetch('/api/uploads',{method:'POST',body:new FormData(e.currentTarget)});const d=await r.json();button.disabled=false;if(!r.ok){st.textContent=d.error;st.className='status error';return}st.textContent='Documents received. Your Growth Desk now has them for review.';st.className='status';e.currentTarget.reset();load()});
 $('#payButton').addEventListener('click',async()=>{const st=$('#payStatus'),button=$('#payButton');st.className='status';st.textContent='Preparing secure PayFast checkout…';button.disabled=true;const r=await fetch('/api/payfast/checkout',{method:'POST'});const d=await r.json();if(!r.ok){st.textContent=d.error||'Secure checkout is not available yet.';st.className='status error';button.disabled=false;return}const f=$('#payForm');f.action=d.url;f.innerHTML=Object.entries(d.fields).map(([k,v])=>`<input type="hidden" name="${esc(k)}" value="${esc(v)}">`).join('');f.submit()});
@@ -56,14 +85,8 @@ async function confirmReturnedPayments(){
   for(let attempt=0;attempt<12;attempt++){
     await new Promise(resolve=>setTimeout(resolve,5000));
     try{
-      if(auditReturned){
-        const r=await fetch('/api/portal',{cache:'no-store'});
-        if(r.ok){const d=await r.json();if(paymentComplete(d.payments)){await load();return}}
-      }
-      if(offerReturned){
-        const r=await fetch('/api/client/offers',{cache:'no-store'});
-        if(r.ok){const d=await r.json();if(d.payments?.some(p=>String(p.status||'').toUpperCase()==='COMPLETE')){await load();return}}
-      }
+      if(auditReturned){const r=await fetch('/api/portal',{cache:'no-store'});if(r.ok){const d=await r.json();if(paymentComplete(d.payments)){await load();return}}}
+      if(offerReturned){const r=await fetch('/api/client/offers',{cache:'no-store'});if(r.ok){const d=await r.json();if(d.payments?.some(p=>String(p.status||'').toUpperCase()==='COMPLETE')){await load();return}}}
     }catch{}
   }
   if(auditReturned&&payStatus){payStatus.textContent='PayFast has not confirmed the payment yet. Your payment is not being charged again. Refresh this page shortly; if it remains pending, contact the Growth Desk.';payStatus.className='status'}
