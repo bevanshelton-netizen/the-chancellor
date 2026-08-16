@@ -1,7 +1,7 @@
 const state={leads:[],activities:[],metrics:null,sources:[]};
 const $=id=>document.getElementById(id);
 const money=n=>new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR',maximumFractionDigits:0}).format(Number(n||0));
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#039;'}[c]));
 async function api(url,options={}){const res=await fetch(url,{headers:{'Content-Type':'application/json',...(options.headers||{})},...options});const data=await res.json().catch(()=>({}));if(!res.ok)throw Object.assign(new Error(data.error||'Request failed'),{status:res.status});return data}
 function showLogin(message=''){ $('loginPanel').classList.remove('hidden'); $('crmApp').classList.add('hidden'); $('loginMessage').textContent=message; }
 function showApp(){ $('loginPanel').classList.add('hidden'); $('crmApp').classList.remove('hidden'); }
@@ -14,7 +14,8 @@ function renderStages(){const entries=Object.entries(state.metrics.stageCounts||
 function render(){renderScoreboard();renderLeads();renderActivities();renderStages()}
 async function load(){try{const data=await api('/api/crm');Object.assign(state,data);showApp();$('leadSource').innerHTML=state.sources.map(s=>`<option>${esc(s)}</option>`).join('');render()}catch(e){if(e.status===401)return showLogin();throw e}}
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/auth/admin',{method:'POST',body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});await load()}catch(err){showLogin(err.message)}});
-$('forgotPasswordBtn').addEventListener('click',async()=>{const current=$('loginEmail').value.trim();const email=window.prompt('Enter the administrator email address. We will send a secure one-time sign-in link.',current);if(!email)return;try{$('loginMessage').textContent='Sending secure sign-in link…';const result=await api('/api/auth/admin/forgot',{method:'POST',body:JSON.stringify({email})});$('loginMessage').textContent=result.message||'Check your email for the secure sign-in link.';}catch(err){$('loginMessage').textContent=err.message;}});
+$('forgotPasswordBtn').addEventListener('click',async()=>{const current=$('loginEmail').value.trim();const email=window.prompt('Enter the administrator email address.',current);if(!email)return;$('loginEmail').value=email;try{$('loginMessage').textContent='Creating secure recovery…';const result=await api('/api/auth/admin/forgot',{method:'POST',body:JSON.stringify({email})});$('loginMessage').textContent=result.message||'Recovery instructions created.';if(result.method==='console-code'){$('recoveryCodePanel').classList.remove('hidden');$('recoveryCode').focus()}else{$('recoveryCodePanel').classList.add('hidden')}}catch(err){$('loginMessage').textContent=err.message;}});
+$('verifyRecoveryCodeBtn').addEventListener('click',async()=>{const email=$('loginEmail').value.trim();const code=$('recoveryCode').value.trim();if(!email||!code){$('loginMessage').textContent='Enter the administrator email and recovery code.';return}try{$('loginMessage').textContent='Verifying recovery code…';await api('/api/auth/admin/recover-code',{method:'POST',body:JSON.stringify({email,code})});$('recoveryCode').value='';$('recoveryCodePanel').classList.add('hidden');await load()}catch(err){$('loginMessage').textContent=err.message}});
 $('logoutBtn').addEventListener('click',async()=>{await api('/api/auth/logout',{method:'POST'}).catch(()=>{});showLogin()});
 $('refreshBtn').addEventListener('click',load);
 $('toggleLeadForm').addEventListener('click',()=> $('leadForm').classList.toggle('hidden'));
