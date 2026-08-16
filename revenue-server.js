@@ -43,6 +43,7 @@ loadFeature('public-proof', './public-proof-routes');
 loadFeature('referrals', './referral-routes');
 loadFeature('institutional-accounts', './institutional-routes');
 loadFeature('crm', './crm-routes');
+loadFeature('crm-forecasting', './crm-forecast-routes');
 loadFeature('crm-public-quotes', './crm-public-quote-routes');
 loadFeature('crm-commercial-documents', './crm-commercial-doc-routes');
 const crmQuoteFollowups = loadFeature('crm-quote-followups', './crm-quote-followup-routes');
