@@ -14,6 +14,7 @@ function renderStages(){const entries=Object.entries(state.metrics.stageCounts||
 function render(){renderScoreboard();renderLeads();renderActivities();renderStages()}
 async function load(){try{const data=await api('/api/crm');Object.assign(state,data);showApp();$('leadSource').innerHTML=state.sources.map(s=>`<option>${esc(s)}</option>`).join('');render()}catch(e){if(e.status===401)return showLogin();throw e}}
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/auth/admin',{method:'POST',body:JSON.stringify({email:$('loginEmail').value,password:$('loginPassword').value})});await load()}catch(err){showLogin(err.message)}});
+$('forgotPasswordBtn').addEventListener('click',async()=>{const current=$('loginEmail').value.trim();const email=window.prompt('Enter the administrator email address. We will send a secure one-time sign-in link.',current);if(!email)return;try{$('loginMessage').textContent='Sending secure sign-in link…';const result=await api('/api/auth/admin/forgot',{method:'POST',body:JSON.stringify({email})});$('loginMessage').textContent=result.message||'Check your email for the secure sign-in link.';}catch(err){$('loginMessage').textContent=err.message;}});
 $('logoutBtn').addEventListener('click',async()=>{await api('/api/auth/logout',{method:'POST'}).catch(()=>{});showLogin()});
 $('refreshBtn').addEventListener('click',load);
 $('toggleLeadForm').addEventListener('click',()=> $('leadForm').classList.toggle('hidden'));
