@@ -44,6 +44,7 @@ loadFeature('outcomes', './outcome-routes');
 loadFeature('public-proof', './public-proof-routes');
 loadFeature('referrals', './referral-routes');
 loadFeature('institutional-accounts', './institutional-routes');
+loadFeature('crm', './crm-routes');
 const communications = loadFeature('communications', './communications-routes');
 
 coreApp.get('/api/features', (_req, res) => {
