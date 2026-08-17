@@ -79,4 +79,6 @@ module.exports=function registerDeliveryRoutes(app){
     if(!file)return res.status(404).send('File not found');
     const full=path.join(dir,path.basename(file.storedName));if(!fs.existsSync(full))return res.status(404).send('File not found');res.download(full,file.originalName);
   });
+
+  require('./delivery-concierge-routes')(app);
 };
