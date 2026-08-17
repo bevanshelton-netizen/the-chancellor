@@ -25,6 +25,30 @@ const descriptions = {
   unsure: 'Use the Business Readiness Audit as the front door when you know something needs attention but do not yet know what.'
 };
 
+const fallbackServices = [
+  { id: 'audit', title: 'Business Readiness Audit', category: 'diagnose', price: 500, route: '/#audit' },
+  { id: 'rescue', title: 'Business Rescue & Turnaround', category: 'recovery', route: '/?service=business-rescue#adviser' },
+  { id: 'debt', title: 'Financial Distress & Debt Support', category: 'recovery', route: '/rescue.html' },
+  { id: 'funding', title: 'Funding Readiness', category: 'capital', route: '/?service=funding#adviser' },
+  { id: 'business-plan', title: 'Business Plans', category: 'capital', route: '/?service=business-plan#adviser' },
+  { id: 'investor-pack', title: 'Funding & Investor Packs', category: 'capital', route: '/?service=investor-pack#adviser' },
+  { id: 'tenders', title: 'Tender Readiness', category: 'opportunity', route: '/?service=tenders#adviser' },
+  { id: 'profile', title: 'Company Profile', category: 'position', route: '/?service=company-profile#adviser' },
+  { id: 'sales', title: 'Sales Rescue', category: 'growth', route: '/?service=sales#adviser' },
+  { id: 'marketing', title: 'Marketing Strategy', category: 'growth', route: '/?service=marketing#adviser' },
+  { id: 'startup', title: 'Start-a-Business Desk', category: 'startup', route: '/?service=startup#adviser' },
+  { id: 'compliance', title: 'Business Compliance Check', category: 'risk', route: '/?service=compliance#adviser' },
+  { id: 'cashflow', title: 'Cash-Flow Rescue', category: 'recovery', route: '/?service=cashflow#adviser' },
+  { id: 'pricing', title: 'Pricing & Profitability Review', category: 'profit', route: '/?service=pricing#adviser' },
+  { id: 'growth', title: 'Growth Strategy Session', category: 'growth', route: '/?service=growth#adviser' },
+  { id: 'ai', title: 'AI for Business', category: 'digital', route: '/?service=ai#adviser' },
+  { id: 'digital', title: 'Digital Business Setup', category: 'digital', route: '/?service=digital#adviser' },
+  { id: 'brand', title: 'Brand & Corporate Identity', category: 'position', route: '/?service=brand#adviser' },
+  { id: 'mentorship', title: 'Entrepreneur Mentorship', category: 'support', route: '/?service=mentorship#adviser' },
+  { id: 'emergency', title: 'Business Emergency Desk', category: 'recovery', route: '/?service=emergency#adviser' },
+  { id: 'unsure', title: 'I’m Not Sure What I Need', category: 'diagnose', route: '/#audit' }
+];
+
 function card(service) {
   const article = document.createElement('article');
   article.className = 'service-card';
@@ -40,18 +64,31 @@ function card(service) {
   return article;
 }
 
-fetch('/api/one-stop-shop/services')
-  .then(r => r.json())
-  .then(data => {
-    if (!data.ok || !Array.isArray(data.services)) throw new Error('Service desk unavailable.');
-    grid.innerHTML = '';
-    data.services.forEach(service => grid.appendChild(card(service)));
-    status.textContent = `${data.services.length} Chancellor service pathways available.`;
-  })
-  .catch(error => {
-    status.textContent = error.message || 'The service desk could not load. Please start with the Business Readiness Audit.';
-    grid.innerHTML = '<article class="service-card"><span class="service-category">diagnose</span><h3>Business Readiness Audit</h3><span class="price-tag">R500 once-off</span><p>Start with a structured diagnosis of your business.</p><a class="button" href="/#audit">Start my audit</a></article>';
-  });
+function renderServices(services, message) {
+  grid.innerHTML = '';
+  services.forEach(service => grid.appendChild(card(service)));
+  status.textContent = message || `${services.length} Chancellor service pathways available.`;
+}
+
+async function loadServices() {
+  try {
+    const response = await fetch('/api/one-stop-shop/services', { headers: { Accept: 'application/json' }, cache: 'no-store' });
+    const type = response.headers.get('content-type') || '';
+    if (!response.ok || !type.includes('application/json')) throw new Error('API unavailable');
+    const data = await response.json();
+    if (!data.ok || !Array.isArray(data.services) || !data.services.length) throw new Error('Service desk unavailable');
+    renderServices(data.services);
+  } catch {
+    renderServices(fallbackServices, `${fallbackServices.length} Chancellor service pathways available.`);
+  }
+}
+
+if (/\.vercel\.app$/i.test(location.hostname)) {
+  const target = `https://the-chancellor.onrender.com${location.pathname}${location.search}${location.hash}`;
+  location.replace(target);
+} else {
+  loadServices();
+}
 
 document.addEventListener('click', event => {
   const link = event.target.closest('[data-service-link]');
