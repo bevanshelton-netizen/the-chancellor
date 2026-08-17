@@ -21,6 +21,7 @@ function loadFeature(name, file) {
 
 loadFeature('brand-fallbacks', './brand-fallback-routes');
 loadFeature('one-stop-shop', './one-stop-shop-routes');
+loadFeature('concierge', './concierge-routes');
 loadFeature('offers', './offer-routes');
 loadFeature('audit-quotations', './quote-routes');
 loadFeature('quote-followups', './quote-followup-routes');
@@ -79,6 +80,7 @@ function buildHomepage(){
     html=html.replace(/src="\/brand\/crest\.jpg[^\"]*"/g,`src="${crest}"`);
     html=html.replace(/src="assets\/the-chancellor-crest\.svg[^\"]*"/g,`src="${crest}"`);
   }
+  if(!html.includes('concierge-client.js'))html=html.replace('</body>','<script src="/concierge-client.js?v=20260817-1"></script></body>');
   return html;
 }
 
@@ -98,6 +100,7 @@ const criticalAssets={
   '/brand-assets.js':['brand-assets.js','application/javascript; charset=utf-8'],
   '/brand-repair.js':['brand-repair.js','application/javascript; charset=utf-8'],
   '/acquisition-client.js':['acquisition-client.js','application/javascript; charset=utf-8'],
+  '/concierge-client.js':['concierge-client.js','application/javascript; charset=utf-8'],
   '/app.js':['app.js','application/javascript; charset=utf-8']
 };
 for(const [route,[file,type]] of Object.entries(criticalAssets)){
