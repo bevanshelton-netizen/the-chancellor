@@ -8,6 +8,33 @@ $('#voiceToggle').addEventListener('click',()=>{voiceOn=!voiceOn;const b=$('#voi
 $('#micButton').addEventListener('click',()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){alert('Voice input is not supported by this browser. You can still type your answer.');return}const recognition=new SR();recognition.lang='en-ZA';recognition.interimResults=false;$('#micButton').textContent='●';recognition.onresult=e=>{input.value=e.results[0][0].transcript;input.focus()};recognition.onend=()=>{$('#micButton').textContent='🎙'};recognition.onerror=()=>{$('#micButton').textContent='🎙'};recognition.start()});
 fetch('/api/status').then(r=>r.json()).then(s=>{aiVoice=Boolean(s.voice)}).catch(()=>{});
 
+const servicePrompts={
+'funding':'I need funding and want to know whether my business is funder-ready.',
+'contracts':'I need help preparing my business to win contracts.',
+'tenders':'I need help getting my business tender-ready.',
+'customers':'I need more customers and stronger sales.',
+'investment':'I need to prepare my business for an investor conversation.',
+'growth':'My business is established and I want a strategy to scale to the next level.',
+'business-rescue':'My business is in trouble and I need a turnaround plan.',
+'business-plan':'I need a professional business plan.',
+'investor-pack':'I need a funding or investor pack for a serious funding conversation.',
+'company-profile':'I need a professional company profile that sells my business properly.',
+'sales':'I have a product or service but I need more customers and sales.',
+'marketing':'I need a practical marketing strategy to generate more enquiries and customers.',
+'startup':'I want to start a business and need help turning the idea into a workable launch plan.',
+'compliance':'I need to identify compliance and documentation gaps in my business.',
+'cashflow':'My cash flow is under pressure and I need to understand where the money is going.',
+'pricing':'I need to know whether my pricing is actually profitable.',
+'ai':'I want to use AI and automation practically in my business.',
+'digital':'I need help setting up my business online, including digital selling and payments.',
+'brand':'I need stronger branding and corporate positioning.',
+'mentorship':'I want ongoing business mentorship and accountability.',
+'emergency':'My business has an urgent problem and I need to know what to do first.',
+'unsure':'I am not sure what my business needs. Please help me diagnose the gaps first.'
+};
+function startServicePathway(){const params=new URLSearchParams(location.search);let service=params.get('service');if(!service){try{service=sessionStorage.getItem('chancellorSelectedService')||''}catch{}}const prompt=servicePrompts[service];if(!prompt)return;try{sessionStorage.removeItem('chancellorSelectedService')}catch{}setTimeout(()=>answer(prompt),250)}
+startServicePathway();
+
 const readinessSections=[
 ['Business Foundation',[
 ['q01','Is your business formally registered?'],['q02','Do you have a clear business structure and ownership arrangement?'],['q03','Do you have a defined product or service offering?'],['q04','Do you know your ideal customer?'],['q05','Do you have clear business goals for the next 12 months?']]],
