@@ -23,6 +23,7 @@ loadFeature('brand-fallbacks', './brand-fallback-routes');
 loadFeature('one-stop-shop', './one-stop-shop-routes');
 loadFeature('concierge', './concierge-routes');
 loadFeature('post-audit-concierge', './post-audit-concierge-routes');
+loadFeature('client-memory', './client-memory-routes');
 loadFeature('offers', './offer-routes');
 loadFeature('audit-quotations', './quote-routes');
 loadFeature('quote-followups', './quote-followup-routes');
@@ -102,6 +103,7 @@ const criticalAssets={
   '/brand-repair.js':['brand-repair.js','application/javascript; charset=utf-8'],
   '/acquisition-client.js':['acquisition-client.js','application/javascript; charset=utf-8'],
   '/concierge-client.js':['concierge-client.js','application/javascript; charset=utf-8'],
+  '/client-memory-client.js':['client-memory-client.js','application/javascript; charset=utf-8'],
   '/app.js':['app.js','application/javascript; charset=utf-8']
 };
 for(const [route,[file,type]] of Object.entries(criticalAssets)){
