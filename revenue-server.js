@@ -22,6 +22,7 @@ function loadFeature(name, file) {
 loadFeature('brand-fallbacks', './brand-fallback-routes');
 loadFeature('one-stop-shop', './one-stop-shop-routes');
 loadFeature('concierge', './concierge-routes');
+loadFeature('post-audit-concierge', './post-audit-concierge-routes');
 loadFeature('offers', './offer-routes');
 loadFeature('audit-quotations', './quote-routes');
 loadFeature('quote-followups', './quote-followup-routes');
