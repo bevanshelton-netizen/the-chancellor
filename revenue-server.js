@@ -24,6 +24,7 @@ loadFeature('one-stop-shop', './one-stop-shop-routes');
 loadFeature('concierge', './concierge-routes');
 loadFeature('post-audit-concierge', './post-audit-concierge-routes');
 loadFeature('client-memory', './client-memory-routes');
+const relationshipManager = loadFeature('relationship-manager', './relationship-manager-routes');
 loadFeature('offers', './offer-routes');
 loadFeature('audit-quotations', './quote-routes');
 loadFeature('quote-followups', './quote-followup-routes');
@@ -123,12 +124,14 @@ catch (error) { console.error(`[feature] follow-up scanner: disabled — ${Strin
 
 const runCommunications = () => communications?.scan ? communications.scan().catch(error => console.error('Communications scan failed:', error.message)) : Promise.resolve();
 const runCrmQuoteFollowups = () => crmQuoteFollowups?.scan ? crmQuoteFollowups.scan().catch(error => console.error('CRM quotation follow-up scan failed:', error.message)) : Promise.resolve();
+const runRelationshipManager = () => { try { return relationshipManager?.scan ? relationshipManager.scan() : null; } catch(error) { console.error('Relationship Manager scan failed:', error.message); return null; } };
 const port = Number(process.env.PORT || 3000);
 const server = app.listen(port, () => {
   console.log(`The Chancellor complete v1 ready at http://localhost:${port}`);
   try { scanFollowups(); } catch (error) { console.error('Initial follow-up scan failed:', error.message); }
   setTimeout(runCommunications, 1000).unref();
   setTimeout(runCrmQuoteFollowups, 1500).unref();
+  setTimeout(runRelationshipManager, 2000).unref();
 });
 
 const followupInterval = setInterval(() => { try { scanFollowups(); } catch (error) { console.error('Scheduled follow-up scan failed:', error.message); } }, 15 * 60 * 1000);
@@ -138,12 +141,15 @@ crmQuoteFollowupInterval.unref();
 const communicationsIntervalMs=Math.max(15*60*1000,Number(process.env.COMMS_SCAN_INTERVAL_MINUTES||30)*60*1000);
 const communicationsInterval=setInterval(runCommunications,communicationsIntervalMs);
 communicationsInterval.unref();
+const relationshipInterval=setInterval(runRelationshipManager,6*60*60*1000);
+relationshipInterval.unref();
 
 function close(signal) {
   console.log(`${signal} received; closing cleanly.`);
   clearInterval(followupInterval);
   clearInterval(crmQuoteFollowupInterval);
   clearInterval(communicationsInterval);
+  clearInterval(relationshipInterval);
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(1), 10000).unref();
 }
