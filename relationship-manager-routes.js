@@ -40,15 +40,28 @@ function scan(){
       if(assignment.status==='Client review'&&ageDays(assignment.updatedAt||assignment.completedAt||assignment.startedAt)>=2)created+=Boolean(addAction(db,audit,'client-review','high','Client approval outstanding',`${assignment.service} is ready for client review.`,'Request approval or revision feedback',assignment.id));
       if(assignment.status==='Completed'&&!testimonials.length&&ageDays(assignment.completedAt)>=1)created+=Boolean(addAction(db,audit,'testimonial','medium','Testimonial opportunity',`${assignment.service} has been completed.`,'Request client testimonial and publication consent',assignment.id));
     }
-    if(paidAudit&&ageDays(lastTouch)>=30){
-      const d=ageDays(lastTouch);const cycle=d>=90?'90-day':d>=60?'60-day':'30-day';
-      created+=Boolean(addAction(db,audit,`growth-${cycle}`,'medium',`${cycle} growth check-in`,'It is time to review progress, priorities and the next growth opportunity.',`Run ${cycle} Chancellor growth check-in`));
-    }
+    if(paidAudit&&ageDays(lastTouch)>=30){const d=ageDays(lastTouch);const cycle=d>=90?'90-day':d>=60?'60-day':'30-day';created+=Boolean(addAction(db,audit,`growth-${cycle}`,'medium',`${cycle} growth check-in`,'It is time to review progress, priorities and the next growth opportunity.',`Run ${cycle} Chancellor growth check-in`));}
   }
   return{created,totalOpen:(store.read().relationshipActions||[]).filter(a=>a.status==='Open').length,scannedAt:iso()};
 }
+function executive(){
+  const db=store.read(),leads=db.crmLeads||[],actions=(db.relationshipActions||[]).filter(a=>a.status==='Open'),assignments=db.assignments||[],offers=db.offers||[];
+  const openDeals=leads.filter(l=>!['WON','LOST'].includes(String(l.stage||'').toUpperCase()));
+  const pipeline=openDeals.reduce((s,l)=>s+Number(l.value||0),0);
+  const weightedPipeline=openDeals.reduce((s,l)=>{const st=String(l.stage||'').toUpperCase();const p=st.includes('PROPOSAL')?.7:st.includes('CONVERSATION')?.5:st.includes('REPLIED')?.35:st.includes('CONTACT')?.2:.1;return s+Number(l.value||0)*p},0);
+  const cash=[...(db.payments||[]),...(db.offerPayments||[])].filter(isComplete).reduce((s,p)=>s+Number(p.amount||0),0)+(db.crmQuotePayments||[]).filter(p=>String(p.status||'').toUpperCase()!=='INITIATED').reduce((s,p)=>s+Number(p.amount||0),0);
+  const active=assignments.filter(a=>a.status!=='Completed'),overdue=active.filter(a=>a.deadline&&new Date(a.deadline).getTime()<now());
+  const renewals=actions.filter(a=>a.type==='renewal'),stalled=actions.filter(a=>['urgent','high'].includes(a.priority));
+  const priority={urgent:5,high:4,medium:3,low:2};const top=[];
+  actions.forEach(a=>top.push({score:(priority[a.priority]||1)*100+Math.min(30,ageDays(a.createdAt)),title:a.title,detail:a.nextAction}));
+  overdue.forEach(a=>top.push({score:480,title:`Overdue delivery: ${a.service}`,detail:a.clientMessage||'Unblock this assignment today.'}));
+  offers.filter(o=>String(o.status||'').includes('Accepted')&&!String(o.status||'').includes('Paid')).forEach(o=>top.push({score:470,title:`Close payment: ${o.service}`,detail:`Accepted offer awaiting R${Number(o.amount||0).toFixed(0)} payment.`}));
+  openDeals.filter(l=>String(l.temperature||'').toUpperCase()==='HOT').forEach(l=>top.push({score:430,title:`Hot deal: ${l.businessName||l.name||'Lead'}`,detail:l.nextAction||'Make a closing attempt today.'}));
+  return{metrics:{cashCollected:cash,pipeline,weightedPipeline,openDeals:openDeals.length,openQuotes:(db.crmQuotes||[]).filter(q=>!['PAID','CANCELLED','EXPIRED'].includes(String(q.status||'').toUpperCase())).length,stalledClients:stalled.length,activeAssignments:active.length,overdueAssignments:overdue.length,renewalsDue:renewals.length,relationshipActions:actions.length},top5:top.sort((a,b)=>b.score-a.score).slice(0,5),generatedAt:iso()};
+}
 module.exports=function registerRelationshipManager(app){
   app.get('/api/admin/relationship-manager',requireAdmin,(_req,res)=>{const db=store.read();const audits=db.audits||[];const actions=(db.relationshipActions||[]).filter(a=>a.status!=='Done').map(a=>{const audit=audits.find(x=>x.id===a.auditId)||{};return{...a,clientName:audit.name||'',businessName:audit.businessName||'',email:audit.email||'',phone:audit.phone||''}}).sort((a,b)=>({urgent:4,high:3,medium:2,low:1}[b.priority]||0)-({urgent:4,high:3,medium:2,low:1}[a.priority]||0));res.json({ok:true,actions})});
+  app.get('/api/admin/executive-command',requireAdmin,(_req,res)=>res.json({ok:true,...executive()}));
   app.post('/api/admin/relationship-manager/scan',requireAdmin,(_req,res)=>res.json({ok:true,...scan()}));
   app.post('/api/admin/relationship-manager/:id/done',requireAdmin,(req,res)=>{const action=store.update('relationshipActions',req.params.id,{status:'Done',completedAt:iso()});if(!action)return res.status(404).json({error:'Action not found.'});res.json({ok:true,action})});
   app.get('/api/client/relationship-actions',requireClient,(req,res)=>{const actions=(store.read().relationshipActions||[]).filter(a=>a.auditId===req.session.clientId&&a.status==='Open').slice(-5).reverse().map(({id,title,message,nextAction,priority,createdAt})=>({id,title,message,nextAction,priority,createdAt}));res.json({ok:true,actions})});
