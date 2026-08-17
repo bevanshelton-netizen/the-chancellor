@@ -52,6 +52,8 @@ loadFeature('crm-forecasting', './crm-forecast-routes');
 loadFeature('crm-public-quotes', './crm-public-quote-routes');
 loadFeature('crm-commercial-documents', './crm-commercial-doc-routes');
 const crmQuoteFollowups = loadFeature('crm-quote-followups', './crm-quote-followup-routes');
+loadFeature('executive-command', './executive-command-routes');
+loadFeature('autonomous-executive-actions', './autonomous-executive-routes');
 loadFeature('admin-recovery', './admin-recovery-routes');
 const communications = loadFeature('communications', './communications-routes');
 
@@ -105,6 +107,8 @@ const criticalAssets={
   '/acquisition-client.js':['acquisition-client.js','application/javascript; charset=utf-8'],
   '/concierge-client.js':['concierge-client.js','application/javascript; charset=utf-8'],
   '/client-memory-client.js':['client-memory-client.js','application/javascript; charset=utf-8'],
+  '/executive-command-client.js':['executive-command-client.js','application/javascript; charset=utf-8'],
+  '/autonomous-executive-client.js':['autonomous-executive-client.js','application/javascript; charset=utf-8'],
   '/app.js':['app.js','application/javascript; charset=utf-8']
 };
 for(const [route,[file,type]] of Object.entries(criticalAssets)){
