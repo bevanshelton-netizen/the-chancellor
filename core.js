@@ -13,7 +13,11 @@ function verifySecret(secret, stored = '') {
   return actual.length === expectedBuffer.length && crypto.timingSafeEqual(actual, expectedBuffer);
 }
 function accessCode() { return crypto.randomBytes(4).toString('hex').toUpperCase(); }
-function pfEncode(value) { return encodeURIComponent(String(value).trim()).replace(/%20/g, '+'); }
+function pfEncode(value) {
+  return encodeURIComponent(String(value).trim())
+    .replace(/[!'()*~]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%20/g, '+');
+}
 function payfastSignature(fields, passphrase = '') {
   const body = Object.entries(fields)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
