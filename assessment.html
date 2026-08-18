@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Business Readiness Audit | The Chancellor</title>
+<meta name="description" content="Complete The Chancellor's 100-point Business Readiness Assessment and identify the priorities holding your business back from growth.">
+<style>
+:root{--black:#0b0a09;--panel:#15130f;--gold:#c9a653;--cream:#f4efe4;--muted:#b9ad96;--line:#3a3328;--green:#54a86c;--amber:#d39a3a;--red:#c95e5e}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#211c14 0,#0b0a09 45%);color:var(--cream);font-family:Arial,Helvetica,sans-serif;line-height:1.45}.shell{max-width:980px;margin:auto;padding:28px 18px 70px}.brand{display:flex;align-items:center;gap:15px;margin-bottom:24px}.brand img{width:58px;height:58px;object-fit:contain}.eyebrow{color:var(--gold);font-size:12px;letter-spacing:.18em;text-transform:uppercase}.brand h1{font-family:Georgia,serif;font-size:24px;margin:2px 0}.hero{border:1px solid var(--line);background:linear-gradient(135deg,rgba(201,166,83,.13),rgba(255,255,255,.025));border-radius:20px;padding:32px;margin-bottom:20px}.hero h2{font-family:Georgia,serif;font-size:clamp(32px,6vw,54px);line-height:1.03;margin:8px 0 14px}.hero p{max-width:760px;color:#d7cdbb}.price{display:inline-block;background:var(--gold);color:#0b0a09;font-weight:800;padding:10px 15px;border-radius:999px;margin-top:8px}.notice{font-size:13px;color:var(--muted)}.card{background:rgba(21,19,15,.95);border:1px solid var(--line);border-radius:16px;padding:22px;margin:16px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:700px){.grid{grid-template-columns:1fr}.hero{padding:22px}}label{display:block;font-size:13px;color:#d8cfbf;margin-bottom:6px}input,textarea,select{width:100%;background:#0d0c0a;color:#fff;border:1px solid #4b4335;border-radius:10px;padding:12px;font:inherit}textarea{min-height:88px}.section-head{display:flex;justify-content:space-between;gap:15px;align-items:end;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:8px}.section-head h3{font-family:Georgia,serif;font-size:24px;margin:0}.weight{color:var(--gold);font-weight:700}.question{padding:15px 0;border-bottom:1px solid #29251e}.question:last-child{border-bottom:0}.qtext{font-size:15px;margin-bottom:10px}.options{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.option{position:relative}.option input{position:absolute;opacity:0;pointer-events:none}.option span{display:block;text-align:center;border:1px solid #4b4335;border-radius:10px;padding:10px 7px;cursor:pointer;color:#d8cfbf;font-size:13px}.option input:checked+span{border-color:var(--gold);background:rgba(201,166,83,.18);color:#fff}.actions{position:sticky;bottom:0;background:rgba(11,10,9,.94);backdrop-filter:blur(12px);padding:14px 0;border-top:1px solid var(--line);margin-top:22px}.btn{border:0;border-radius:12px;background:var(--gold);color:#0a0908;font-weight:800;padding:14px 20px;font-size:16px;cursor:pointer;width:100%}.btn:disabled{opacity:.5;cursor:not-allowed}.progress{height:8px;background:#302a22;border-radius:99px;overflow:hidden;margin:12px 0}.progress>div{height:100%;width:0;background:var(--gold);transition:width .2s}.result{display:none}.score{font-family:Georgia,serif;font-size:62px;color:var(--gold);line-height:1}.band{font-size:24px;font-weight:800;margin:8px 0}.priority{border-left:3px solid var(--gold);padding:9px 14px;margin:12px 0;background:#11100d}.small{font-size:12px;color:var(--muted)}a{color:var(--gold)}
+</style>
+</head>
+<body>
+<main class="shell">
+  <div class="brand"><img src="/brand/crest.jpg" alt="The Chancellor crest"><div><div class="eyebrow">The Chancellor's</div><h1>Business Growth Desk</h1></div></div>
+  <section class="hero"><div class="eyebrow">Serious businesses. Clear diagnosis. Practical growth.</div><h2>100-Point Business Readiness Assessment</h2><p>Answer 48 focused questions across the 12 areas that determine whether your business is ready to scale. The assessment identifies your strongest foundations, the three priority gaps holding you back, and the most appropriate next interventions.</p><span class="price">Formal Business Readiness Audit — R500</span><p class="notice">Your assessment can be completed here. Payment unlocks the formal report and Growth Desk action plan. This is a business planning aid, not a guarantee of funding, tenders, contracts or financial outcomes.</p></section>
+
+  <form id="assessmentForm">
+    <section class="card"><div class="section-head"><div><div class="eyebrow">Business details</div><h3>Tell The Chancellor about your business</h3></div></div><div class="grid">
+      <div><label for="name">Your name *</label><input id="name" name="name" required></div>
+      <div><label for="businessName">Business name *</label><input id="businessName" name="businessName" required></div>
+      <div><label for="email">Email *</label><input id="email" name="email" type="email" required></div>
+      <div><label for="phone">Phone / WhatsApp *</label><input id="phone" name="phone" required></div>
+      <div><label for="industry">Industry *</label><input id="industry" name="industry" required></div>
+      <div><label for="registrationNumber">Registration number</label><input id="registrationNumber" name="registrationNumber"></div>
+    </div><div style="margin-top:14px"><label for="goal">What is the single most important business goal you want to achieve next? *</label><textarea id="goal" name="goal" required></textarea></div></section>
+    <div class="progress" aria-label="Assessment progress"><div id="progressBar"></div></div>
+    <div id="questions"></div>
+    <div class="actions"><button class="btn" id="submitBtn" type="submit">Calculate My Business Readiness Score</button></div>
+  </form>
+
+  <section class="card result" id="result" aria-live="polite"><div class="eyebrow">Your Business Readiness Result</div><div class="score" id="score">0/100</div><div class="band" id="band"></div><p id="meaning"></p><h3>Top 3 priorities</h3><div id="priorities"></div><p class="small" id="accessNote"></p><p><a href="/portal.html">Continue to your client portal →</a></p></section>
+</main>
+<script src="/assessment.js"></script>
+</body>
+</html>
