@@ -4,6 +4,7 @@ const {normalise}=require('./core');
 const requireClient=(req,res,next)=>req.session?.clientId?next():res.status(401).json({error:'Please sign in to continue.'});
 const clean=(v,max=1600)=>String(v??'').trim().replace(/[\u0000-\u001F\u007F]/g,'').slice(0,max);
 const money=n=>Number(Number(n||0).toFixed(2));
+const resumeRe=/^(?:continue(?: where we left off)?|continue|resume|proceed|next|carry on|go on|yes|ok|okay)$/i;
 
 function complete(list=[]){return list.filter(x=>String(x.status||'').toUpperCase()==='COMPLETE')}
 function clientUniverse(db,audit){
@@ -65,6 +66,13 @@ module.exports=function registerClientMemoryRoutes(app){
     let db=store.read(),audit=(db.audits||[]).find(a=>a.id===req.session.clientId);if(!audit)return res.status(404).json({error:'Client record not found.'});
     let u=clientUniverse(db,audit),memory=memorySummary(audit,u);
     store.insert('clientMemoryMessages',{auditId:audit.id,role:'user',content:message,createdAt:new Date().toISOString()});
+
+    if(resumeRe.test(message)&&memory.current.stage==='Audit'&&/R500 audit payment/i.test(memory.current.nextAction||'')){
+      const reply='We are exactly where we left off: your Business Readiness Audit is ready and the R500 payment is still pending. I am opening the secure PayFast checkout now.';
+      store.insert('clientMemoryMessages',{auditId:audit.id,role:'assistant',content:reply,createdAt:new Date().toISOString()});
+      return res.json({ok:true,reply,memory,action:{type:'payfast_checkout'}});
+    }
+
     let reply='';
     if(process.env.OPENAI_API_KEY){
       try{
