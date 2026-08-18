@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/one-stop-shop", "destination": "/one-stop-shop.html" },
+    { "source": "/one-stop-shop/", "destination": "/one-stop-shop.html" }
+  ]
+}
