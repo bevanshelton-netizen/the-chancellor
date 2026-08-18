@@ -33,6 +33,7 @@ loadFeature('production', './production-routes');
 loadFeature('document-intelligence', './intelligence-routes');
 loadFeature('exports', './export-routes');
 loadFeature('readiness-report', './readiness-report-routes');
+loadFeature('readiness-assessment-100', './readiness-assessment-routes');
 loadFeature('follow-ups', './followup-routes');
 loadFeature('acquisition', './acquisition-routes');
 loadFeature('activation', './activation-routes');
@@ -109,6 +110,7 @@ const criticalAssets={
   '/client-memory-client.js':['client-memory-client.js','application/javascript; charset=utf-8'],
   '/executive-command-client.js':['executive-command-client.js','application/javascript; charset=utf-8'],
   '/autonomous-executive-client.js':['autonomous-executive-client.js','application/javascript; charset=utf-8'],
+  '/assessment.js':['assessment.js','application/javascript; charset=utf-8'],
   '/app.js':['app.js','application/javascript; charset=utf-8']
 };
 for(const [route,[file,type]] of Object.entries(criticalAssets)){
