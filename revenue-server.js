@@ -132,13 +132,16 @@ const runCommunications = () => communications?.scan ? communications.scan().cat
 const runCrmQuoteFollowups = () => crmQuoteFollowups?.scan ? crmQuoteFollowups.scan().catch(error => console.error('CRM quotation follow-up scan failed:', error.message)) : Promise.resolve();
 const runRelationshipManager = () => { try { return relationshipManager?.scan ? relationshipManager.scan() : null; } catch(error) { console.error('Relationship Manager scan failed:', error.message); return null; } };
 const port = Number(process.env.PORT || 3000);
-const server = app.listen(port, () => {
-  console.log(`The Chancellor complete v1 ready at http://localhost:${port}`);
+const host = '0.0.0.0';
+const server = app.listen(port, host, () => {
+  console.log(`The Chancellor complete v1 ready at http://${host}:${port}`);
   try { scanFollowups(); } catch (error) { console.error('Initial follow-up scan failed:', error.message); }
   setTimeout(runCommunications, 1000).unref();
   setTimeout(runCrmQuoteFollowups, 1500).unref();
   setTimeout(runRelationshipManager, 2000).unref();
 });
+server.keepAliveTimeout = 120000;
+server.headersTimeout = 125000;
 
 const followupInterval = setInterval(() => { try { scanFollowups(); } catch (error) { console.error('Scheduled follow-up scan failed:', error.message); } }, 15 * 60 * 1000);
 followupInterval.unref();
