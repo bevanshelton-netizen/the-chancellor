@@ -10,6 +10,7 @@
   const prioritiesEl=document.getElementById('priorities');
   const accessNote=document.getElementById('accessNote');
   let definition=[];
+  let maxScore=90;
 
   function answeredCount(){
     return definition.flatMap(s=>s.questions).filter(q=>form.querySelector(`input[name="${q.id}"]:checked`)).length;
@@ -44,6 +45,7 @@
     if(!response.ok) throw new Error('Assessment is temporarily unavailable.');
     const data=await response.json();
     definition=data.sections||[];
+    maxScore=Number(data.maxScore||90);
     render();
   }
 
@@ -58,7 +60,7 @@
 
   function showResult(data){
     const audit=data.audit||{};
-    scoreEl.textContent=`${audit.score||0}/100`;
+    scoreEl.textContent=`${audit.score||0}/${audit.maxScore||maxScore}`;
     bandEl.textContent=audit.band||'Readiness result';
     meaningEl.textContent=audit.bandMeaning||audit.recommendation||'';
     prioritiesEl.innerHTML='';
@@ -69,7 +71,10 @@
       el.innerHTML=`<strong>${p.priority?`${p.priority}. `:''}${p.section}</strong><br>${p.percent}% ready · ${p.service||'Priority intervention'}${from}<div class="small">${p.summary||''}</div>`;
       prioritiesEl.appendChild(el);
     });
-    accessNote.textContent=data.accessCode?`Save your client access code: ${data.accessCode}. It is shown only once.`:'';
+    if(data.accessCode){
+      sessionStorage.setItem('newAccessCode',data.accessCode);
+      accessNote.textContent=`Save your client access code: ${data.accessCode}. It is shown only once. Continue to the portal to complete secure payment and unlock the full report.`;
+    }
     form.style.display='none';
     resultEl.style.display='block';
     resultEl.scrollIntoView({behavior:'smooth',block:'start'});
