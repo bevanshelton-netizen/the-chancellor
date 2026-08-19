@@ -16,6 +16,7 @@
   const paymentStatus=document.getElementById('paymentStatus');
   let definition=[];
   let options=[];
+  let maxScore=90;
 
   function allQuestions(){return definition.flatMap(section=>section.questions)}
   function answeredCount(){return allQuestions().filter(q=>form.querySelector(`input[name="${q.id}"]:checked`)).length}
@@ -45,15 +46,15 @@
   }
 
   async function load(){
-    const response=await fetch('/api/readiness/definition',{headers:{Accept:'application/json'}});
-    if(!response.ok) throw new Error('The Business Growth Audit is temporarily unavailable.');
+    const response=await fetch('/api/readiness/definition',{headers:{Accept:'application/json'},cache:'no-store'});
+    if(!response.ok) throw new Error('The Business Readiness Audit is temporarily unavailable.');
     const data=await response.json();
     definition=data.sections||[];
+    maxScore=Number(data.maxScore||90);
     options=data.options||[
       {value:0,label:'Not in place'},
-      {value:2,label:'Weak / informal'},
-      {value:3,label:'Working, but inconsistent'},
-      {value:5,label:'Strong and measured'}
+      {value:1,label:'Partially / inconsistent'},
+      {value:2,label:'Clearly in place'}
     ];
     render();
   }
@@ -69,13 +70,16 @@
 
   function showResult(data){
     const audit=data.audit||{};
-    scoreEl.textContent=`${audit.score||0}/${audit.maxScore||140}`;
-    bandEl.textContent=audit.band||'Business Growth result';
+    scoreEl.textContent=`${audit.score||0}/${audit.maxScore||maxScore}`;
+    bandEl.textContent=audit.band||'Business Readiness result';
     meaningEl.textContent=audit.bandMeaning||audit.recommendation||'';
     riskEl.textContent=audit.biggestRisk||audit.priorities?.[0]?.section||'Priority review required.';
-    opportunityEl.textContent=audit.biggestOpportunity||audit.priorities?.[0]?.summary||'Your formal report will identify the strongest commercial opportunity.';
+    opportunityEl.textContent=audit.biggestOpportunity||'Your strongest category will support the next growth move.';
     interventionEl.textContent=audit.priorityIntervention||audit.recommendedService||'Business Growth intervention';
-    accessNote.textContent=data.accessCode?`Save your client access code: ${data.accessCode}. It is shown only once.`:'';
+    if(data.accessCode){
+      sessionStorage.setItem('newAccessCode',data.accessCode);
+      accessNote.textContent=`Save your client access code: ${data.accessCode}. It is shown only once.`;
+    }else accessNote.textContent='';
     form.style.display='none';
     resultEl.style.display='block';
     resultEl.scrollIntoView({behavior:'smooth',block:'start'});
@@ -110,7 +114,7 @@
     event.preventDefault();
     if(!form.reportValidity()) return;
     submitBtn.disabled=true;
-    submitBtn.textContent='Preparing your Business Growth diagnosis…';
+    submitBtn.textContent='Preparing your Business Readiness diagnosis…';
     try{
       const response=await fetch('/api/readiness/submit',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload())});
       const data=await response.json();

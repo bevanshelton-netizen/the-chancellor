@@ -8,30 +8,41 @@ function offerPaid(offer,payments=[]){return offer.status==='Paid'||payments.som
 function clientNextStep(audit,fileCount){const stage=String(audit.salesStage||'');if(stage==='Delivered')return'Delivered';if(['Follow-on paid','In delivery'].includes(stage))return'Delivery in progress';if(stage==='Offer accepted')return'Complete follow-on payment';if(stage==='Offer sent')return'Review your growth offer';return fileCount?'Human review':'Upload documents'}
 
 const serviceMap={
-  'Business Foundation':['Business Foundation Pack','Clarify structure, offer, target customer and 12-month priorities.'],
+  'Business Foundation':['Business Foundation & Compliance Pack','Strengthen structure, records, compliance priorities and management foundations.'],
+  'Product / Service':['Offer, Pricing & Profitability Fix','Clarify the offer, improve pricing and focus the business on profitable demand.'],
+  'Sales':['30-Day Sales & Lead Conversion Rescue','Build a repeatable lead, quotation, follow-up and conversion process.'],
+  'Marketing & Brand':['Marketing & Lead Generation','Improve positioning, campaigns, visibility and measurable lead generation.'],
+  'Cash Flow & Finance':['Cash-Flow & Finance Improvement','Strengthen records, margins, collections, cash-flow visibility and management reporting.'],
+  'Customers':['Customer Growth & Retention Pack','Improve customer fit, service, retention, referrals and repeat revenue.'],
+  'Operations':['Operations Improvement Programme','Improve procedures, capacity, supplier controls and service delivery systems.'],
+  'People & Capacity':['People & Capacity Improvement','Clarify roles, accountability, skills gaps and the capacity needed for growth.'],
+  'Growth Readiness':['90-Day Growth Strategy','Turn the strongest opportunities into a practical, measurable growth plan.'],
   'Finance & Cash Flow':['Cash-Flow Improvement','Strengthen records, cash-flow forecasting, costing and financial visibility.'],
-  'Sales':['Sales Growth System','Build a repeatable lead, quotation, follow-up and customer-retention process.'],
   'Marketing':['Marketing & Lead Generation','Strengthen positioning, channels and measurable weekly marketing activity.'],
   'Compliance':['Compliance Readiness Pack','Organise statutory, contractual and operating compliance requirements.'],
   'Funding Readiness':['Funding Readiness / Investor Pack','Prepare the evidence, business case and supporting documents funders expect.'],
   'Tender & Contract Readiness':['Tender Readiness Package','Build supplier, company-profile, compliance and bid-response readiness.'],
-  'Operations':['Operations Improvement Programme','Document procedures, capacity, supplier controls and service standards.'],
   'Growth Potential':['90-Day Growth Strategy','Turn growth opportunities into a practical capacity and execution plan.']
 };
-function bandClass(band=''){const b=String(band).toLowerCase();return b.includes('green')?'green':b.includes('amber')?'amber':'red'}
+function bandClass(band='',tone=''){
+  const value=`${band} ${tone}`.toLowerCase();
+  if(value.includes('scale ready')||value.includes('growth ready')||value.includes('green'))return'green';
+  if(value.includes('growth potential')||value.includes('rebuild required')||value.includes('amber')||value.includes('nearly'))return'amber';
+  return'red';
+}
 function renderReadiness(audit={}){
   const sectionScores=audit.sectionScores||{};
   const priorities=Array.isArray(audit.priorities)?audit.priorities:[];
   $('#readinessPercent').textContent=`${Number(audit.readinessPercent||0)}%`;
-  const badge=$('#readinessBadge');badge.textContent=audit.band||'Readiness pending';badge.className=`readiness-badge ${bandClass(audit.band)}`;
-  $('#sectionScores').innerHTML=Object.entries(sectionScores).map(([section,score])=>{const pct=Math.max(0,Math.min(100,Number(score||0)*10));const cls=pct>=70?'green':pct>=40?'amber':'red';return `<article class="readiness-item ${cls}"><div><strong>${esc(section)}</strong><span>${Number(score||0)}/10</span></div><div class="readiness-track"><i style="width:${pct}%"></i></div><small>${pct}% ready</small></article>`}).join('')||'<p class="muted">Your section scores will appear here after the audit is completed.</p>';
-  $('#priorityAreas').innerHTML=priorities.length?priorities.map((p,i)=>`<article><span>0${i+1}</span><div><strong>${esc(p.section)}</strong><small>${Number(p.score||0)}/10 · priority for strengthening</small></div></article>`).join(''):'<p class="muted">Priority areas will appear here after scoring.</p>';
-  const seen=new Set();const services=priorities.map(p=>({section:p.section,detail:serviceMap[p.section]})).filter(x=>x.detail&&!seen.has(x.detail[0])&&seen.add(x.detail[0]));
+  const badge=$('#readinessBadge');badge.textContent=audit.band||'Readiness pending';badge.className=`readiness-badge ${bandClass(audit.band,audit.bandTone)}`;
+  $('#sectionScores').innerHTML=Object.entries(sectionScores).map(([section,score])=>{const detailed=audit.sections?.[section];const max=Number(detailed?.maxScore||10)||10;const pct=Number.isFinite(Number(detailed?.percent))?Number(detailed.percent):Math.round((Number(score||0)/max)*100);const cls=pct>=70?'green':pct>=40?'amber':'red';return `<article class="readiness-item ${cls}"><div><strong>${esc(section)}</strong><span>${Number(score||0)}/${max}</span></div><div class="readiness-track"><i style="width:${Math.max(0,Math.min(100,pct))}%"></i></div><small>${Math.max(0,Math.min(100,pct))}% ready</small></article>`}).join('')||'<p class="muted">Your section scores will appear here after the audit is completed.</p>';
+  $('#priorityAreas').innerHTML=priorities.length?priorities.map((p,i)=>`<article><span>0${i+1}</span><div><strong>${esc(p.section)}</strong><small>${Number.isFinite(Number(p.percent))?Number(p.percent):Math.round((Number(p.score||0)/Number(p.maxScore||10))*100)}% ready · priority for strengthening</small></div></article>`).join(''):'<p class="muted">Priority areas will appear here after scoring.</p>';
+  const seen=new Set();const services=priorities.map(p=>({section:p.section,detail:p.service?[p.service,p.summary||'Recommended from your Business Readiness Audit.']:serviceMap[p.section]})).filter(x=>x.detail&&!seen.has(x.detail[0])&&seen.add(x.detail[0]));
   $('#recommendedServices').innerHTML=services.length?services.map(({section,detail})=>`<article><small>${esc(section)}</small><strong>${esc(detail[0])}</strong><p>${esc(detail[1])}</p></article>`).join(''):'<p class="muted">Recommended follow-on services will appear here after scoring.</p>';
 }
 function renderLockedReadiness(audit={}){
   $('#readinessPercent').textContent=`${Number(audit.readinessPercent||0)}%`;
-  const badge=$('#readinessBadge');badge.textContent=audit.band||'Readiness scored';badge.className=`readiness-badge ${bandClass(audit.band)}`;
+  const badge=$('#readinessBadge');badge.textContent=audit.band||'Readiness scored';badge.className=`readiness-badge ${bandClass(audit.band,audit.bandTone)}`;
   $('#sectionScores').innerHTML='<article class="readiness-item"><div><strong>Your 9-category scorecard is ready</strong></div><small>Complete the R500 payment to unlock every category score and readiness bar.</small></article>';
   $('#priorityAreas').innerHTML='<article><span>01</span><div><strong>Your Top 3 priorities are ready</strong><small>Unlock the three areas that need attention first.</small></div></article>';
   $('#recommendedServices').innerHTML='<article><small>PAID REPORT</small><strong>Your recommended next services are ready</strong><p>Complete the R500 audit payment to unlock the detailed diagnosis, recommendations and downloadable report.</p></article>';
@@ -52,18 +63,19 @@ async function loadOffers(){
 async function load(){
   const r=await fetch('/api/portal'); if(!r.ok)return null; const d=await r.json();
   $('#login').classList.add('hidden'); $('#dashboard').classList.remove('hidden');
-  $('#businessName').textContent=d.audit.businessName; $('#clientGoal').textContent=d.audit.goal; $('#score').textContent=d.audit.score; $('#band').textContent=d.audit.band; $('#status').textContent=d.audit.status; $('#fileCount').textContent=d.files.length;
+  $('#businessName').textContent=d.audit.businessName; $('#clientGoal').textContent=d.audit.goal; $('#score').textContent=`${d.audit.score}/${d.audit.maxScore||90}`; $('#band').textContent=d.audit.band; $('#status').textContent=d.audit.status; $('#fileCount').textContent=d.files.length;
   const paid=paymentComplete(d.payments); const pay=$('#payButton'),payStatus=$('#payStatus'),next=$('#nextStep'),reportButton=$('#downloadReadinessReport'),reportHint=$('#reportDownloadHint'),uploadForm=$('#uploadForm');
   if(paid){
     renderReadiness(d.audit);
     $('#recommendation').textContent=d.audit.recommendation;
     pay.disabled=true;pay.textContent='Payment received ✓';payStatus.textContent='Your R500 audit payment is confirmed. Your Growth Desk can now proceed with review.';payStatus.className='status';next.textContent=clientNextStep(d.audit,d.files.length);reportButton?.classList.remove('hidden');if(reportHint)reportHint.textContent='Your paid Business Readiness Report is ready to download.';
     if(uploadForm){uploadForm.querySelectorAll('input,button').forEach(el=>el.disabled=false)}
+    try{await fetch('/api/client/post-audit-concierge',{cache:'no-store'})}catch{}
     await loadOffers();
   }else{
     renderLockedReadiness(d.audit);
     $('#recommendation').textContent='Your detailed Chancellor recommendation is ready. Complete the R500 audit payment to unlock it.';
-    pay.disabled=false;pay.textContent='Pay R500 & start my review';next.textContent='Secure payment';reportButton?.classList.add('hidden');if(reportHint)reportHint.textContent='Complete the R500 audit payment to unlock your detailed report and recommendations.';
+    pay.disabled=false;pay.textContent='Pay R500 & unlock my report';next.textContent='Secure payment';reportButton?.classList.add('hidden');if(reportHint)reportHint.textContent='Complete the R500 audit payment to unlock your detailed report and recommendations.';
     if(uploadForm){uploadForm.querySelectorAll('input,button').forEach(el=>el.disabled=true);const st=$('#uploadStatus');if(st){st.textContent='Document upload unlocks after the R500 audit payment is confirmed.';st.className='status'}}
     $('#offers').innerHTML='<p class="muted">Your follow-on service options will appear after the paid audit review.</p>';
     if(qs.get('payment')==='returned')payStatus.textContent='You have returned from PayFast. We are confirming your payment automatically…';
