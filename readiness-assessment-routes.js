@@ -1,27 +1,41 @@
 const store=require('./store');
 const {normalise,hashSecret,accessCode,cleanPublicAudit}=require('./core');
-const {scoreReadiness,publicDefinition}=require('./readiness-engine');
+const {ANSWER_OPTIONS,scoreReadiness,publicDefinition}=require('./readiness-engine');
+
+function leadClassification(body={},scoring={}){
+  const challenge=normalise(body.primaryChallenge).toLowerCase();
+  const funding=normalise(body.fundingNeed).toLowerCase();
+  const turnover=normalise(body.turnoverBand).toLowerCase();
+  const intent=normalise(body.implementationIntent).toLowerCase();
+  if(/cash|debt|tax|creditor|struggl|rescue/.test(challenge)) return 'STABILISATION LEAD';
+  if((funding && !['no','not currently'].includes(funding)) || /fund/.test(challenge)) return 'FUNDING LEAD';
+  if(/website|digital|online|automation/.test(challenge)) return 'DIGITAL GROWTH LEAD';
+  if(/r0|idea|pre-revenue|not trading/.test(turnover)) return 'EARLY-STAGE LEAD';
+  if(intent==='yes' || scoring.score>=90) return 'HOT IMPLEMENTATION LEAD';
+  return 'GROWTH LEAD';
+}
 
 module.exports=function registerReadinessAssessmentRoutes(app){
   app.get('/api/readiness/definition',(_req,res)=>{
     res.setHeader('Cache-Control','no-store');
-    res.json({ok:true,maxScore:100,price:500,currency:'ZAR',sections:publicDefinition()});
+    res.json({ok:true,maxScore:140,price:500,currency:'ZAR',options:ANSWER_OPTIONS,sections:publicDefinition()});
   });
 
   app.post('/api/readiness/preview',(req,res)=>{
     const result=scoreReadiness(req.body||{});
-    res.json({ok:true,score:result.score,maxScore:100,band:result.band,bandCode:result.bandCode,bandMeaning:result.bandMeaning,sections:result.sections,priorities:result.priorities,recommendations:result.recommendations});
+    res.json({ok:true,score:result.score,maxScore:140,readinessPercent:result.readinessPercent,band:result.band,bandCode:result.bandCode,bandMeaning:result.bandMeaning,sections:result.sections,priorities:result.priorities,recommendations:result.recommendations,biggestRisk:result.biggestRisk,biggestOpportunity:result.biggestOpportunity,priorityIntervention:result.priorityIntervention});
   });
 
   app.post('/api/readiness/submit',(req,res)=>{
-    const required=['name','email','phone','businessName','industry','goal'];
+    const required=['name','email','phone','businessName','industry','goal','primaryChallenge','turnoverBand','implementationIntent'];
     if(required.some(key=>!normalise(req.body?.[key]))) return res.status(400).json({error:'Please complete every required business and contact field.'});
     const answers=req.body.answers&&typeof req.body.answers==='object'?req.body.answers:{};
     const definition=publicDefinition();
     const expected=definition.flatMap(section=>section.questions.map(q=>q.id));
-    if(expected.some(id=>answers[id]===undefined||answers[id]===null||String(answers[id]).trim()==='')) return res.status(400).json({error:'Please answer all readiness questions before submitting.'});
+    if(expected.some(id=>answers[id]===undefined||answers[id]===null||String(answers[id]).trim()==='')) return res.status(400).json({error:'Please answer all Business Growth Audit questions before submitting.'});
 
     const scoring=scoreReadiness({answers});
+    const leadClass=leadClassification(req.body,scoring);
     const code=accessCode();
     const audit=store.insert('audits',{
       name:normalise(req.body.name),
@@ -31,19 +45,24 @@ module.exports=function registerReadinessAssessmentRoutes(app){
       registrationNumber:normalise(req.body.registrationNumber),
       industry:normalise(req.body.industry),
       goal:normalise(req.body.goal),
+      primaryChallenge:normalise(req.body.primaryChallenge),
+      turnoverBand:normalise(req.body.turnoverBand),
+      fundingNeed:normalise(req.body.fundingNeed),
+      implementationIntent:normalise(req.body.implementationIntent),
       answers,
-      assessmentType:'Business Readiness 100',
+      assessmentType:'Business Growth Audit 140',
       ...scoring,
+      leadClassification:leadClass,
       status:'Awaiting payment',
       salesStage:'Audit lead',
       recommendedService:scoring.recommendations[0]?.service||'',
       quoteAmount:0,
-      nextAction:'Complete R500 audit payment',
+      nextAction:'Complete R500 Business Growth Audit payment',
       accessHash:hashSecret(code),
       notes:[],
       recommendation:scoring.recommendation
     });
     req.session.clientId=audit.id;
-    res.status(201).json({ok:true,audit:cleanPublicAudit(audit),accessCode:code,message:'Assessment saved. Complete the R500 payment to unlock the formal readiness report and Growth Desk action plan.'});
+    res.status(201).json({ok:true,audit:cleanPublicAudit(audit),accessCode:code,message:'Preliminary score saved. Complete the R500 payment to unlock the formal Business Growth Audit report and action plan.'});
   });
 };
