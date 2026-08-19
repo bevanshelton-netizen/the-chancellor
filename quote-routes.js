@@ -1,69 +1,63 @@
+const PDFDocument=require('pdfkit');
+const fs=require('node:fs');
+const path=require('node:path');
 const store=require('./store');
 const {buildQuoteSuggestion}=require('./quote-engine');
 
 const requireClient=(req,res,next)=>req.session?.clientId?next():res.status(401).json({error:'Please sign in to continue.'});
 const requireAdmin=(req,res,next)=>req.session?.admin?next():res.status(401).json({error:'Administrator sign-in required.'});
 const paidAudit=(db,auditId)=>(db.payments||[]).some(p=>p.auditId===auditId&&String(p.status||'').toUpperCase()==='COMPLETE');
+const GOLD='#C9A653',BLACK='#11100E',CREAM='#F4EFE4',MUTED='#6F675A',GREEN='#2E7D32',AMBER='#B7791F',RED='#A33A3A';
 
-function publicSuggestion(audit){
-  const q=buildQuoteSuggestion(audit);
-  return {service:q.service,amount:q.amount,description:q.description,deliverables:q.deliverables,primaryPriority:q.primaryPriority,supportingPriorities:q.supportingPriorities,humanReviewRequired:Boolean(q.humanReviewRequired)};
+function safeName(value='business'){return String(value).replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').slice(0,60)||'business'}
+function money(value){return `R${Number(value||0).toLocaleString('en-ZA',{maximumFractionDigits:0})}`}
+function embeddedImage(svgPath){try{const source=fs.readFileSync(svgPath,'utf8');const match=source.match(/data:image\/(webp|png|jpeg|jpg);base64,([^"']+)/i);return match?Buffer.from(match[2],'base64'):null}catch{return null}}
+function bandColour(audit={}){const value=`${audit.band||''} ${audit.bandTone||''}`.toLowerCase();if(value.includes('strong')||value.includes('growth ready')||value.includes('green'))return GREEN;if(value.includes('attention')||value.includes('amber'))return AMBER;return RED}
+function footer(doc,label){const y=doc.page.height-45;doc.strokeColor('#D8CBAF').lineWidth(.5).moveTo(54,y-10).lineTo(doc.page.width-54,y-10).stroke();doc.fillColor(MUTED).font('Helvetica').fontSize(7.7).text('The Chancellor’s Business Growth Desk · Powered by Izakhono Africa',54,y,{width:330});doc.text(label,doc.page.width-240,y,{width:186,align:'right'})}
+function ensure(doc,height,label){if(doc.y+height>doc.page.height-72){footer(doc,label);doc.addPage();doc.y=54}}
+function startPdf(res,audit,title,label,filename){
+  res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`attachment; filename="${filename}"`);res.setHeader('Cache-Control','private, no-store');
+  const doc=new PDFDocument({size:'A4',margin:54,info:{Title:title,Author:"The Chancellor's Business Growth Desk"}});doc.pipe(res);
+  const crest=embeddedImage(path.join(__dirname,'assets','the-chancellor-crest.svg'));if(crest)doc.image(crest,54,42,{fit:[58,58]});
+  doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(16).text('THE CHANCELLOR’S',124,47);doc.fillColor(GOLD).fontSize(10).text('BUSINESS GROWTH DESK',124,69);doc.fillColor(MUTED).font('Helvetica').fontSize(9).text(label,124,86);
+  doc.strokeColor(GOLD).lineWidth(2).moveTo(54,112).lineTo(doc.page.width-54,112).stroke();
+  doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(22).text(audit.businessName||title,54,134,{width:doc.page.width-108});doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(`Prepared for ${audit.name||'Client'} · ${new Date().toLocaleDateString('en-ZA')}`,54,168);doc.y=202;return doc;
 }
+function publicSuggestion(audit){const q=buildQuoteSuggestion(audit);return {service:q.service,amount:q.amount,tier:q.tier,tierLabel:q.tierLabel,description:q.description,deliverables:q.deliverables,primaryPriority:q.primaryPriority,supportingPriorities:q.supportingPriorities,focusAreas:q.focusAreas,readinessPercent:q.readinessPercent,weakSectionCount:q.weakSectionCount,humanReviewRequired:Boolean(q.humanReviewRequired)}}
 
 function createRecommendedOffer(audit){
-  const db=store.read();
-  const existing=(db.offers||[]).slice().reverse().find(o=>o.auditId===audit.id&&!['Expired','Cancelled'].includes(String(o.status||''))&&o.source==='automatic-recommendation');
-  if(existing)return existing;
+  const db=store.read();const existing=(db.offers||[]).slice().reverse().find(o=>o.auditId===audit.id&&!['Expired','Cancelled'].includes(String(o.status||''))&&o.source==='automatic-recommendation');if(existing)return existing;
   const q=buildQuoteSuggestion(audit);
-  const offer=store.insert('offers',{
-    auditId:audit.id,businessName:audit.businessName,clientName:audit.name,clientEmail:audit.email,
-    code:q.code,service:q.service,amount:Number(q.amount),recurring:false,
-    description:q.description,deliverables:q.deliverables,status:'Sent',acceptedAt:null,paidAt:null,
-    expiresAt:new Date(Date.now()+Number(q.expiresInDays||14)*86400000).toISOString(),source:'automatic-recommendation',humanReviewed:false
-  });
-  store.update('audits',audit.id,{salesStage:'Offer sent',recommendedService:q.service,quoteAmount:q.amount,nextAction:'Client to review, accept and pay follow-on offer'});
-  return offer;
+  const offer=store.insert('offers',{auditId:audit.id,businessName:audit.businessName,clientName:audit.name,clientEmail:audit.email,code:q.code,service:q.service,amount:Number(q.amount),recurring:false,description:q.description,deliverables:q.deliverables,status:'Sent',acceptedAt:null,paidAt:null,expiresAt:new Date(Date.now()+Number(q.expiresInDays||14)*86400000).toISOString(),source:'automatic-recommendation',humanReviewed:false,tier:q.tier,tierLabel:q.tierLabel,focusAreas:q.focusAreas,readinessPercent:q.readinessPercent});
+  store.update('audits',audit.id,{salesStage:'Offer sent',recommendedService:q.service,quoteAmount:q.amount,nextAction:'Review the implementation proposal, accept the recommended package and pay securely'});return offer;
+}
+
+function auditReport(res,audit){
+  const filename=`${safeName(audit.businessName)}-Business-Growth-Audit-Report.pdf`;const doc=startPdf(res,audit,`${audit.businessName||'Business'} Business Growth Audit Report`,'BUSINESS GROWTH AUDIT REPORT',filename);const q=buildQuoteSuggestion(audit);const max=Number(audit.maxScore||225);const pct=Number(audit.readinessPercent||Math.round(Number(audit.score||0)/max*100));const colour=bandColour(audit);
+  doc.roundedRect(54,202,doc.page.width-108,112,8).fill(CREAM);doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(10).text('BUSINESS READINESS',72,220);doc.fillColor(colour).fontSize(34).text(`${pct}%`,72,242);doc.fillColor(BLACK).fontSize(11).text(`${Number(audit.score||0)}/${max} points`,190,250);doc.fillColor(colour).fontSize(12).text(String(audit.band||'Assessment complete'),190,271,{width:270});doc.y=340;
+  doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(15).text('Executive diagnosis');doc.moveDown(.35).fillColor(MUTED).font('Helvetica').fontSize(10.2).text(audit.bandMeaning||'This assessment identifies the business areas that should be strengthened before the next stage of growth.',{lineGap:3});
+  ensure(doc,160,'Business Growth Audit Report');doc.moveDown(1).fillColor(BLACK).font('Helvetica-Bold').fontSize(15).text('Readiness across 9 business areas');doc.moveDown(.5);
+  for(const [section,raw] of Object.entries(audit.sectionScores||{})){ensure(doc,46,'Business Growth Audit Report');const d=audit.sections?.[section]||{};const score=Number(d.score??raw??0);const sectionMax=Number(d.maxScore||25);const spct=Number.isFinite(Number(d.percent))?Number(d.percent):Math.round(score/sectionMax*100);const c=spct>=60?GREEN:spct>=40?AMBER:RED;const y=doc.y;doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(9.6).text(section,54,y,{width:300});doc.fillColor(MUTED).font('Helvetica').fontSize(9).text(`${score}/${sectionMax} · ${spct}%`,doc.page.width-158,y,{width:104,align:'right'});doc.roundedRect(54,y+17,doc.page.width-108,7,3.5).fill('#E7E0D2');if(spct>0)doc.roundedRect(54,y+17,(doc.page.width-108)*(Math.min(100,spct)/100),7,3.5).fill(c);doc.y=y+36}
+  ensure(doc,150,'Business Growth Audit Report');doc.moveDown(.8).fillColor(BLACK).font('Helvetica-Bold').fontSize(15).text('Top 3 priorities');doc.moveDown(.45);(audit.priorities||[]).slice(0,3).forEach((p,i)=>{ensure(doc,54,'Business Growth Audit Report');const y=doc.y;doc.circle(68,y+11,11).fill(GOLD);doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(8).text(String(i+1),64,y+6,{width:8,align:'center'});doc.fillColor(BLACK).fontSize(10.5).text(p.section,90,y,{width:350});doc.fillColor(MUTED).font('Helvetica').fontSize(9).text(`${Number(p.percent||0)}% ready · ${p.summary||'Priority for focused strengthening.'}`,90,y+16,{width:390});doc.y=y+45});
+  ensure(doc,170,'Business Growth Audit Report');doc.moveDown(.7).fillColor(BLACK).font('Helvetica-Bold').fontSize(15).text('The Chancellor’s prescription');doc.moveDown(.45);const y=doc.y;doc.roundedRect(54,y,doc.page.width-108,116,7).strokeColor('#D8CBAF').lineWidth(.8).stroke();doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(8.5).text(q.tierLabel.toUpperCase(),68,y+13);doc.fillColor(BLACK).fontSize(12).text(q.service,68,y+29,{width:330});doc.fillColor(MUTED).font('Helvetica').fontSize(9.3).text(q.description,68,y+48,{width:335,lineGap:2});doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(18).text(money(q.amount),doc.page.width-170,y+28,{width:102,align:'right'});doc.fillColor(MUTED).font('Helvetica').fontSize(8).text('recommended once-off implementation',doc.page.width-190,y+52,{width:122,align:'right'});doc.y=y+132;
+  ensure(doc,95,'Business Growth Audit Report');doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(11).text('Important notice');doc.moveDown(.2).fillColor(MUTED).font('Helvetica').fontSize(8.4).text('This report is a business-growth assessment and planning aid. It does not guarantee funding, tenders, contracts, tax outcomes, debt relief, legal outcomes or investment returns. Regulated matters should be handled by appropriately qualified professionals.',{lineGap:2});footer(doc,'Business Growth Audit Report');doc.end();
+}
+
+function implementationProposal(res,audit){
+  const q=buildQuoteSuggestion(audit);const filename=`${safeName(audit.businessName)}-Implementation-Proposal.pdf`;const doc=startPdf(res,audit,`${audit.businessName||'Business'} Implementation Proposal`,'IMPLEMENTATION PROPOSAL',filename);const max=Number(audit.maxScore||225);
+  doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(15).text('Audit-led implementation recommendation');doc.moveDown(.4).fillColor(MUTED).font('Helvetica').fontSize(10.3).text(`Your Business Growth Audit recorded ${Number(audit.readinessPercent||0)}% readiness (${Number(audit.score||0)}/${max}) and classified the business as ${audit.band||'assessment complete'}. The proposal below focuses investment on the constraints most likely to restrict growth.`,{lineGap:3});
+  ensure(doc,165,'Implementation Proposal');doc.moveDown(1).roundedRect(54,doc.y,doc.page.width-108,128,8).fill(CREAM);const y=doc.y;doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(8.5).text(q.tierLabel.toUpperCase(),70,y+15);doc.fillColor(BLACK).fontSize(15).text(q.service,70,y+32,{width:330});doc.fillColor(MUTED).font('Helvetica').fontSize(9.5).text(q.description,70,y+56,{width:330,lineGap:2});doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(23).text(money(q.amount),doc.page.width-188,y+32,{width:118,align:'right'});doc.fillColor(MUTED).font('Helvetica').fontSize(8.5).text('once-off recommended investment',doc.page.width-205,y+61,{width:135,align:'right'});doc.y=y+148;
+  ensure(doc,120,'Implementation Proposal');doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(14).text('Implementation focus');doc.moveDown(.35);(q.focusAreas||[q.primaryPriority]).forEach((area,i)=>{doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(9).text(`${i+1}.`,54,doc.y,{continued:true});doc.fillColor(BLACK).text(` ${area}`);doc.moveDown(.25)});doc.moveDown(.4).fillColor(MUTED).font('Helvetica').fontSize(9.7).text(q.deliverables,{lineGap:3});
+  ensure(doc,155,'Implementation Proposal');doc.moveDown(1).fillColor(BLACK).font('Helvetica-Bold').fontSize(14).text('Execution sequence');doc.moveDown(.45);const priorities=(audit.priorities||[]).slice(0,q.tier==='focused'?1:q.tier==='growth'?2:3);priorities.forEach((p,i)=>{ensure(doc,50,'Implementation Proposal');doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(10).text(`${i+1}. ${p.section} (${Number(p.percent||0)}% ready)`);doc.moveDown(.18).fillColor(MUTED).font('Helvetica').fontSize(9).text(p.summary||'Strengthen this area and measure the result before the next implementation stage.',{lineGap:2});doc.moveDown(.55)});
+  ensure(doc,155,'Implementation Proposal');doc.moveDown(.8).fillColor(BLACK).font('Helvetica-Bold').fontSize(14).text('Commercial terms');doc.moveDown(.35).fillColor(MUTED).font('Helvetica').fontSize(9.6).list([`Recommended once-off investment: ${money(q.amount)}.`,`Proposal validity: ${q.expiresInDays||14} days from issue.`,`The payable offer is available in your private Growth Desk portal and is processed securely through PayFast.`,`Implementation begins after payment confirmation and Growth Desk delivery assignment.`,`Any regulated legal, tax, financial-advice or debt-counselling work is referred to appropriately qualified professionals where required.`],{bulletRadius:2,textIndent:14,lineGap:3});
+  ensure(doc,85,'Implementation Proposal');doc.moveDown(.8).fillColor(BLACK).font('Helvetica-Bold').fontSize(10.5).text('Acceptance');doc.moveDown(.2).fillColor(MUTED).font('Helvetica').fontSize(9).text('Acceptance is completed electronically in the client portal. Review the scope and price before accepting and paying the recommended offer.');footer(doc,'Implementation Proposal');doc.end();
 }
 
 module.exports=function registerQuoteRoutes(app){
-  app.get('/api/client/quote-recommendation',requireClient,(req,res)=>{
-    const db=store.read();const audit=(db.audits||[]).find(a=>a.id===req.session.clientId);
-    if(!audit)return res.status(404).json({error:'Audit not found.'});
-    const isPaid=paidAudit(db,audit.id);
-    const request=(db.quoteRequests||[]).slice().reverse().find(x=>x.auditId===audit.id)||null;
-    const sentOffer=isPaid?createRecommendedOffer(audit):((db.offers||[]).slice().reverse().find(o=>o.auditId===audit.id&&o.source==='automatic-recommendation')||null);
-    res.json({recommendation:publicSuggestion(audit),auditPaid:isPaid,request,sentOffer});
-  });
-
-  app.post('/api/client/quote-recommendation/request',requireClient,(req,res)=>{
-    const db=store.read();const audit=(db.audits||[]).find(a=>a.id===req.session.clientId);
-    if(!audit)return res.status(404).json({error:'Audit not found.'});
-    if(!paidAudit(db,audit.id))return res.status(402).json({error:'Complete the R500 Business Readiness Audit payment before requesting a follow-on quotation.'});
-    let request=(db.quoteRequests||[]).slice().reverse().find(x=>x.auditId===audit.id&&['Requested','Approved'].includes(x.status));
-    const suggestion=buildQuoteSuggestion(audit);
-    const offer=createRecommendedOffer(audit);
-    if(!request){
-      request=store.insert('quoteRequests',{auditId:audit.id,businessName:audit.businessName,clientName:audit.name,clientEmail:audit.email,status:'Approved',suggestion,requestedAt:new Date().toISOString(),approvedAt:new Date().toISOString(),offerId:offer.id});
-    }else if(request.status!=='Approved'){
-      request=store.update('quoteRequests',request.id,{status:'Approved',approvedAt:new Date().toISOString(),offerId:offer.id});
-    }
-    res.status(201).json({request,recommendation:publicSuggestion(audit),offer});
-  });
-
-  app.get('/api/admin/quote-overview',requireAdmin,(_req,res)=>{
-    const db=store.read();
-    const requests=db.quoteRequests||[];
-    const rows=(db.audits||[]).map(a=>({auditId:a.id,businessName:a.businessName,name:a.name,paid:paidAudit(db,a.id),recommendation:publicSuggestion(a),request:requests.slice().reverse().find(x=>x.auditId===a.id)||null,offer:(db.offers||[]).slice().reverse().find(o=>o.auditId===a.id&&o.source==='automatic-recommendation')||null}));
-    res.json({rows});
-  });
-
-  app.post('/api/admin/audits/:auditId/recommended-offer',requireAdmin,(req,res)=>{
-    const db=store.read();const audit=(db.audits||[]).find(a=>a.id===req.params.auditId);
-    if(!audit)return res.status(404).json({error:'Audit not found.'});
-    if(!paidAudit(db,audit.id))return res.status(409).json({error:'The R500 audit payment must be confirmed before a recommended follow-on offer is issued.'});
-    const offer=createRecommendedOffer(audit);
-    const request=(store.read().quoteRequests||[]).slice().reverse().find(x=>x.auditId===audit.id&&x.status==='Requested');
-    if(request)store.update('quoteRequests',request.id,{status:'Approved',approvedAt:new Date().toISOString(),offerId:offer.id});
-    res.status(201).json({offer});
-  });
+  app.get('/api/client/quote-recommendation',requireClient,(req,res)=>{const db=store.read();const audit=(db.audits||[]).find(a=>a.id===req.session.clientId);if(!audit)return res.status(404).json({error:'Audit not found.'});const isPaid=paidAudit(db,audit.id);const request=(db.quoteRequests||[]).slice().reverse().find(x=>x.auditId===audit.id)||null;const sentOffer=isPaid?createRecommendedOffer(audit):((db.offers||[]).slice().reverse().find(o=>o.auditId===audit.id&&o.source==='automatic-recommendation')||null);res.json({recommendation:publicSuggestion(audit),auditPaid:isPaid,request,sentOffer})});
+  app.get('/api/client/business-growth-audit-report.pdf',requireClient,(req,res)=>{const db=store.read();const audit=(db.audits||[]).find(a=>a.id===req.session.clientId);if(!audit)return res.status(404).json({error:'Audit not found.'});if(!paidAudit(db,audit.id))return res.status(402).json({error:'Complete the R500 Business Growth Audit payment before downloading your report.'});auditReport(res,audit)});
+  app.get('/api/client/implementation-proposal.pdf',requireClient,(req,res)=>{const db=store.read();const audit=(db.audits||[]).find(a=>a.id===req.session.clientId);if(!audit)return res.status(404).json({error:'Audit not found.'});if(!paidAudit(db,audit.id))return res.status(402).json({error:'Complete the R500 Business Growth Audit payment before downloading your implementation proposal.'});implementationProposal(res,audit)});
+  app.post('/api/client/quote-recommendation/request',requireClient,(req,res)=>{const db=store.read();const audit=(db.audits||[]).find(a=>a.id===req.session.clientId);if(!audit)return res.status(404).json({error:'Audit not found.'});if(!paidAudit(db,audit.id))return res.status(402).json({error:'Complete the R500 Business Growth Audit payment before requesting a follow-on quotation.'});let request=(db.quoteRequests||[]).slice().reverse().find(x=>x.auditId===audit.id&&['Requested','Approved'].includes(x.status));const suggestion=buildQuoteSuggestion(audit);const offer=createRecommendedOffer(audit);if(!request)request=store.insert('quoteRequests',{auditId:audit.id,businessName:audit.businessName,clientName:audit.name,clientEmail:audit.email,status:'Approved',suggestion,requestedAt:new Date().toISOString(),approvedAt:new Date().toISOString(),offerId:offer.id});else if(request.status!=='Approved')request=store.update('quoteRequests',request.id,{status:'Approved',approvedAt:new Date().toISOString(),offerId:offer.id});res.status(201).json({request,recommendation:publicSuggestion(audit),offer})});
+  app.get('/api/admin/quote-overview',requireAdmin,(_req,res)=>{const db=store.read();const requests=db.quoteRequests||[];const rows=(db.audits||[]).map(a=>({auditId:a.id,businessName:a.businessName,name:a.name,paid:paidAudit(db,a.id),recommendation:publicSuggestion(a),request:requests.slice().reverse().find(x=>x.auditId===a.id)||null,offer:(db.offers||[]).slice().reverse().find(o=>o.auditId===a.id&&o.source==='automatic-recommendation')||null}));res.json({rows})});
+  app.post('/api/admin/audits/:auditId/recommended-offer',requireAdmin,(req,res)=>{const db=store.read();const audit=(db.audits||[]).find(a=>a.id===req.params.auditId);if(!audit)return res.status(404).json({error:'Audit not found.'});if(!paidAudit(db,audit.id))return res.status(409).json({error:'The R500 audit payment must be confirmed before a recommended follow-on offer is issued.'});const offer=createRecommendedOffer(audit);const request=(store.read().quoteRequests||[]).slice().reverse().find(x=>x.auditId===audit.id&&x.status==='Requested');if(request)store.update('quoteRequests',request.id,{status:'Approved',approvedAt:new Date().toISOString(),offerId:offer.id});res.status(201).json({offer})});
 };
