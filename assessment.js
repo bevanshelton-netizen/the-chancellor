@@ -16,7 +16,21 @@
   const paymentStatus=document.getElementById('paymentStatus');
   let definition=[];
   let options=[];
-  let maxScore=225;
+  let maxScore=180;
+
+  function syncPageCopy(){
+    const hero=document.querySelector('.hero');
+    const title=hero?.querySelector('h2');
+    const intro=hero?.querySelector('p');
+    const trust=hero?.querySelectorAll('.trust div');
+    if(title) title.textContent='90-Question Business Readiness Audit';
+    if(intro) intro.textContent='Answer 90 focused questions across nine critical business areas. You receive a preliminary diagnosis immediately; the R500 payment unlocks the formal report, detailed category scorecard and Growth Desk action plan.';
+    if(trust?.[1]) trust[1].innerHTML='<strong>180-point diagnosis</strong><br>Clear strengths, risks, red flags and priorities.';
+    const progressPoints=document.querySelector('.progress-copy span:last-child');
+    if(progressPoints) progressPoints.textContent='180 points';
+    if(scoreEl && !resultEl?.style.display) scoreEl.textContent='0/180';
+    document.title='R500 90-Question Business Readiness Audit | The Chancellor';
+  }
 
   function allQuestions(){return definition.flatMap(section=>section.questions)}
   function answeredCount(){return allQuestions().filter(q=>form.querySelector(`input[name="${q.id}"]:checked`)).length}
@@ -50,14 +64,13 @@
     if(!response.ok) throw new Error('The Business Readiness Audit is temporarily unavailable.');
     const data=await response.json();
     definition=data.sections||[];
-    maxScore=Number(data.maxScore||225);
+    maxScore=Number(data.maxScore||180);
     options=data.options||[
-      {value:1,label:'Not in place'},
-      {value:2,label:'Very weak'},
-      {value:3,label:'Partly in place'},
-      {value:4,label:'Strong'},
-      {value:5,label:'Fully in place and working well'}
+      {value:0,label:'Not in place'},
+      {value:1,label:'Partially / inconsistent'},
+      {value:2,label:'Clearly in place'}
     ];
+    syncPageCopy();
     render();
   }
 
@@ -72,8 +85,7 @@
 
   function showResult(data){
     const audit=data.audit||{};
-    const percent=Number(audit.readinessPercent||0);
-    scoreEl.textContent=`${percent}% (${audit.score||0}/${audit.maxScore||maxScore})`;
+    scoreEl.textContent=`${audit.score||0}/${audit.maxScore||maxScore}`;
     bandEl.textContent=audit.band||'Business Readiness result';
     meaningEl.textContent=audit.bandMeaning||audit.recommendation||'';
     riskEl.textContent=audit.biggestRisk||audit.priorities?.[0]?.section||'Priority review required.';
@@ -132,5 +144,6 @@
   });
 
   payBtn.addEventListener('click',startCheckout);
+  syncPageCopy();
   load().catch(error=>{questionsEl.innerHTML=`<section class="card"><strong>${error.message}</strong></section>`;submitBtn.disabled=true;});
 })();
