@@ -18,12 +18,12 @@ function leadClassification(body={},scoring={}){
 module.exports=function registerReadinessAssessmentRoutes(app){
   app.get('/api/readiness/definition',(_req,res)=>{
     res.setHeader('Cache-Control','no-store');
-    res.json({ok:true,maxScore:225,price:500,currency:'ZAR',options:ANSWER_OPTIONS,sections:publicDefinition()});
+    res.json({ok:true,maxScore:180,questionCount:90,price:500,currency:'ZAR',options:ANSWER_OPTIONS,sections:publicDefinition()});
   });
 
   app.post('/api/readiness/preview',(req,res)=>{
     const result=scoreReadiness(req.body||{});
-    res.json({ok:true,score:result.score,maxScore:225,readinessPercent:result.readinessPercent,band:result.band,bandCode:result.bandCode,bandTone:result.bandTone,bandMeaning:result.bandMeaning,sections:result.sections,priorities:result.priorities,recommendations:result.recommendations,biggestRisk:result.biggestRisk,biggestOpportunity:result.biggestOpportunity,priorityIntervention:result.priorityIntervention});
+    res.json({ok:true,score:result.score,maxScore:result.maxScore,readinessPercent:result.readinessPercent,band:result.band,bandCode:result.bandCode,bandTone:result.bandTone,bandMeaning:result.bandMeaning,sections:result.sections,priorities:result.priorities,recommendations:result.recommendations,redFlags:result.redFlags,criticalCategories:result.criticalCategories,weakestFive:result.weakestFive,biggestRisk:result.biggestRisk,biggestOpportunity:result.biggestOpportunity,priorityIntervention:result.priorityIntervention,assessmentConfidence:result.assessmentConfidence});
   });
 
   app.post('/api/readiness/submit',(req,res)=>{
@@ -32,15 +32,9 @@ module.exports=function registerReadinessAssessmentRoutes(app){
     const answers=req.body.answers&&typeof req.body.answers==='object'?req.body.answers:{};
     const definition=publicDefinition();
     const expected=definition.flatMap(section=>section.questions.map(q=>q.id));
-    if(expected.some(id=>answers[id]===undefined||answers[id]===null||String(answers[id]).trim()==='')) return res.status(400).json({error:'Please answer all Business Readiness Audit questions before submitting.'});
+    if(expected.some(id=>answers[id]===undefined||answers[id]===null||String(answers[id]).trim()==='')) return res.status(400).json({error:'Please answer all 90 Business Readiness Audit questions before submitting.'});
 
-    const scoring=scoreReadiness({
-      answers,
-      goal:req.body.goal,
-      primaryGoal:req.body.goal,
-      primaryChallenge:req.body.primaryChallenge,
-      fundingNeed:req.body.fundingNeed
-    });
+    const scoring=scoreReadiness({answers});
     const leadClass=leadClassification(req.body,scoring);
     const code=accessCode();
     const audit=store.insert('audits',{
@@ -56,19 +50,19 @@ module.exports=function registerReadinessAssessmentRoutes(app){
       fundingNeed:normalise(req.body.fundingNeed),
       implementationIntent:normalise(req.body.implementationIntent),
       answers,
-      assessmentType:'Business Readiness 225',
+      assessmentType:'90-Question Business Readiness Audit',
       ...scoring,
       leadClassification:leadClass,
       status:'Awaiting payment',
       salesStage:'Audit lead',
       recommendedService:scoring.recommendations[0]?.service||'',
-      quoteAmount:scoring.recommendations[0]?.indicativeFrom||0,
+      quoteAmount:0,
       nextAction:'Complete R500 Business Readiness Audit payment',
       accessHash:hashSecret(code),
       notes:[],
       recommendation:scoring.recommendation
     });
     req.session.clientId=audit.id;
-    res.status(201).json({ok:true,audit:cleanPublicAudit(audit),accessCode:code,message:'Preliminary score saved. Complete the R500 payment to unlock the formal Business Readiness Report and Growth Desk action plan.'});
+    res.status(201).json({ok:true,audit:cleanPublicAudit(audit),accessCode:code,message:'Preliminary diagnosis saved. Complete the R500 payment to unlock the formal Business Readiness Report and Growth Desk action plan.'});
   });
 };
