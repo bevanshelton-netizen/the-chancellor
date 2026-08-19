@@ -1,13 +1,13 @@
 const packages={
-  foundation:{code:'business-proposal',service:'Growth Strategy Session',amount:1250,scope:'Clarify the business foundation, priorities and a practical 30–90 day growth direction.'},
-  finance:{code:'retainer-starter',service:'Financial & Cash-Flow Readiness Intervention',amount:2500,scope:'Improve financial visibility, records, budgeting, collections and cash-flow control.'},
-  sales:{code:'marketing-plan',service:'Sales & Marketing Growth Plan',amount:2500,scope:'Build a repeatable lead-generation, follow-up, conversion and sales-target process.'},
-  marketing:{code:'marketing-plan',service:'Brand & Market Positioning Intervention',amount:2500,scope:'Strengthen positioning, brand credibility, visibility and customer acquisition.'},
-  compliance:{code:'capability',service:'Business Compliance Rescue',amount:1500,scope:'Identify and prioritise registration, tax, licensing, contractual and governance gaps; regulated advice is referred where required.'},
-  funding:{code:'funding-proposal',service:'Funding Readiness Package',amount:3500,scope:'Prepare the business case, numbers, use-of-funds and supporting documentation for funding discussions.'},
-  tender:{code:'tender-support',service:'Tender Readiness Package',amount:2500,scope:'Strengthen supplier readiness, documentation, quotation quality, bid preparation and contract-delivery capability.'},
-  operations:{code:'retainer-growth',service:'Operations & Systems Improvement Plan',amount:3500,scope:'Improve processes, tracking, record-keeping, capacity controls and service delivery.'},
-  growth:{code:'retainer-executive',service:'Growth Accelerator',amount:7500,scope:'Turn multiple growth constraints into a coordinated implementation programme focused on stability, revenue and scale readiness.'}
+  foundation:{code:'business-proposal',service:'Growth Strategy & Foundation Intervention',scope:'Clarify the business foundation, priorities and a practical 30–90 day growth direction.'},
+  finance:{code:'retainer-starter',service:'Financial & Cash-Flow Readiness Intervention',scope:'Improve financial visibility, records, budgeting, collections and cash-flow control.'},
+  sales:{code:'marketing-plan',service:'Sales & Customer Acquisition Intervention',scope:'Build a repeatable lead-generation, follow-up, conversion and sales-target process.'},
+  marketing:{code:'marketing-plan',service:'Brand & Market Positioning Intervention',scope:'Strengthen positioning, brand credibility, visibility and customer acquisition.'},
+  compliance:{code:'capability',service:'Business Compliance Rescue',scope:'Identify and prioritise registration, tax, licensing, contractual and governance gaps; regulated advice is referred where required.'},
+  funding:{code:'funding-proposal',service:'Funding Readiness Implementation',scope:'Prepare the business case, numbers, use-of-funds and supporting documentation for funding discussions.'},
+  tender:{code:'tender-support',service:'Tender & Procurement Readiness Implementation',scope:'Strengthen supplier readiness, documentation, quotation quality, bid preparation and contract-delivery capability.'},
+  operations:{code:'retainer-growth',service:'Operations & Systems Improvement',scope:'Improve processes, tracking, record-keeping, capacity controls and service delivery.'},
+  growth:{code:'retainer-executive',service:'Growth & Scalability Implementation',scope:'Turn growth constraints into a coordinated implementation programme focused on stability, revenue and scale readiness.'}
 };
 
 const sectionKeys={
@@ -23,16 +23,35 @@ const sectionKeys={
   'Multiple business areas':'growth'
 };
 
+const TIERS={
+  focused:{label:'Focused Implementation',amount:3500,code:'retainer-starter'},
+  growth:{label:'Growth Implementation',amount:7500,code:'retainer-growth'},
+  executive:{label:'Executive Growth Implementation',amount:10000,code:'retainer-executive'}
+};
+
 function packageForRecommendation(rec={}){
   const key=rec.key||sectionKeys[rec.section];
   const base=packages[key]||packages.foundation;
-  return {
-    ...base,
-    service:rec.service||base.service,
-    amount:Number(rec.indicativeFrom||base.amount),
-    scope:rec.summary||base.scope,
-    key:key||'foundation'
-  };
+  return {...base,service:rec.service||base.service,scope:rec.summary||base.scope,key:key||'foundation'};
+}
+
+function weakCount(audit={}){
+  if(Number.isFinite(Number(audit.weakSectionCount)))return Number(audit.weakSectionCount);
+  return Object.values(audit.sections||{}).filter(s=>Number(s.percent)<60).length;
+}
+
+function chooseTier(audit={},primary={}){
+  const pct=Number(audit.readinessPercent||0);
+  const weak=weakCount(audit);
+  if(pct<40||weak>=4)return {key:'executive',...TIERS.executive};
+  if(weak>=2||['funding','tender','growth'].includes(primary.key))return {key:'growth',...TIERS.growth};
+  return {key:'focused',...TIERS.focused};
+}
+
+function uniqueFocusAreas(audit={},rec={}){
+  const areas=[rec,...(audit.priorities||[])].filter(Boolean);
+  const seen=new Set();
+  return areas.filter(p=>{const name=String(p.section||'').trim();if(!name||seen.has(name))return false;seen.add(name);return true});
 }
 
 function buildQuoteSuggestion(audit={}){
@@ -40,19 +59,29 @@ function buildQuoteSuggestion(audit={}){
   const fallbackPriority=Array.isArray(audit.priorities)&&audit.priorities.length?audit.priorities[0]:null;
   const rec=primaryRec||fallbackPriority||{section:'Business Foundation & Strategy',key:'foundation'};
   const primary=packageForRecommendation(rec);
-  const supporting=(audit.priorities||[]).filter(p=>p.section!==rec.section).slice(0,2).map(p=>p.section);
-  const description=`${primary.service}, recommended from the Business Readiness Audit because ${rec.section||'the highest-priority business area'} requires focused action first.`;
+  const tier=chooseTier(audit,primary);
+  const focus=uniqueFocusAreas(audit,rec).slice(0,tier.key==='focused'?1:tier.key==='growth'?2:3);
+  const focusNames=focus.map(p=>p.section);
+  const focusScopes=focus.map(p=>p.summary||packageForRecommendation(p).scope).filter(Boolean);
+  const service=tier.key==='focused'?`${primary.service} — Focused Implementation`:tier.key==='growth'?'Business Growth Implementation Programme':'Executive Business Growth Accelerator';
+  const description=`${tier.label} recommended from The Chancellor’s Business Growth Audit. ${focusNames.join(', ')||rec.section||'The highest-priority business area'} requires focused action before the next stage of growth.`;
+  const deliverables=focusScopes.join(' ')||primary.scope;
   return {
-    code:primary.code,
-    service:primary.service,
-    amount:primary.amount,
+    code:tier.code||primary.code,
+    service,
+    amount:tier.amount,
+    tier:tier.key,
+    tierLabel:tier.label,
     description,
-    deliverables:primary.scope,
+    deliverables,
     primaryPriority:rec.section||'Business Foundation & Strategy',
-    supportingPriorities:supporting,
+    supportingPriorities:focusNames.filter(x=>x!==rec.section),
+    focusAreas:focusNames,
+    readinessPercent:Number(audit.readinessPercent||0),
+    weakSectionCount:weakCount(audit),
     expiresInDays:14,
     humanReviewRequired:false
   };
 }
 
-module.exports={packages,sectionKeys,packageForRecommendation,buildQuoteSuggestion};
+module.exports={packages,sectionKeys,TIERS,packageForRecommendation,chooseTier,buildQuoteSuggestion};
