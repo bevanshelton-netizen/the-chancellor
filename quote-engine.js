@@ -1,26 +1,34 @@
 const packages={
-  foundation:{code:'business-proposal',service:'Growth Strategy Session',amount:1250,scope:'Clarify the business foundation, priorities and a practical 30–90 day growth direction.'},
-  finance:{code:'retainer-starter',service:'Financial & Cash-Flow Readiness Intervention',amount:2500,scope:'Improve financial visibility, records, budgeting, collections and cash-flow control.'},
-  sales:{code:'marketing-plan',service:'Sales & Marketing Growth Plan',amount:2500,scope:'Build a repeatable lead-generation, follow-up, conversion and sales-target process.'},
-  marketing:{code:'marketing-plan',service:'Brand & Market Positioning Intervention',amount:2500,scope:'Strengthen positioning, brand credibility, visibility and customer acquisition.'},
-  compliance:{code:'capability',service:'Business Compliance Rescue',amount:1500,scope:'Identify and prioritise registration, tax, licensing, contractual and governance gaps; regulated advice is referred where required.'},
-  funding:{code:'funding-proposal',service:'Funding Readiness Package',amount:3500,scope:'Prepare the business case, numbers, use-of-funds and supporting documentation for funding discussions.'},
-  tender:{code:'tender-support',service:'Tender Readiness Package',amount:2500,scope:'Strengthen supplier readiness, documentation, quotation quality, bid preparation and contract-delivery capability.'},
-  operations:{code:'retainer-growth',service:'Operations & Systems Improvement Plan',amount:3500,scope:'Improve processes, tracking, record-keeping, capacity controls and service delivery.'},
-  growth:{code:'retainer-executive',service:'Growth Accelerator',amount:7500,scope:'Turn multiple growth constraints into a coordinated implementation programme focused on stability, revenue and scale readiness.'}
+  foundation:{code:'business-proposal',service:'Business Strategy & Structure Pack',amount:2500,scope:'Clarify purpose, business model, priorities, structure and management foundations.'},
+  offering:{code:'business-proposal',service:'Pricing & Profitability Review',amount:2500,scope:'Strengthen the offer, pricing, margins, product focus and additional revenue opportunities.'},
+  customers:{code:'marketing-plan',service:'Customer Growth System',amount:2500,scope:'Improve customer insight, retention, service, repeat sales, cross-selling and referral generation.'},
+  sales:{code:'marketing-plan',service:'Sales Growth Intervention',amount:2500,scope:'Build a repeatable lead, quotation, follow-up, conversion and sales-pipeline discipline.'},
+  marketing:{code:'marketing-plan',service:'Marketing & Lead Generation Plan',amount:2500,scope:'Improve positioning, campaigns, proof, visibility and measurable lead generation.'},
+  finance:{code:'retainer-starter',service:'Financial Rescue & Cash Flow Plan',amount:2500,scope:'Strengthen bookkeeping, profitability visibility, cash-flow control, collections and working capital.'},
+  compliance:{code:'capability',service:'Compliance Rescue Package',amount:3500,scope:'Organise statutory, tax, contractual and governance obligations and reduce avoidable business risk; regulated advice is referred where required.'},
+  operations:{code:'retainer-growth',service:'Operations & Systems Improvement',amount:3500,scope:'Improve procedures, controls, delivery, data, tools and owner independence.'},
+  growth:{code:'funding-proposal',service:'Funding & Tender Readiness Pack',amount:5000,scope:'Prepare the business case, documentation, projections, capability evidence and growth execution plan.'}
 };
 
 const sectionKeys={
+  'Business Foundation':'foundation',
+  'Products & Services':'offering',
+  'Customers':'customers',
+  'Sales':'sales',
+  'Marketing':'marketing',
+  'Finance':'finance',
+  'Compliance & Governance':'compliance',
+  'Operations & Systems':'operations',
+  'Funding, Tenders & Growth':'growth',
+  'Multiple business areas':'growth',
+  // Compatibility with audits created under earlier engine versions.
   'Business Foundation & Strategy':'foundation',
   'Financial Readiness':'finance',
   'Sales & Customer Acquisition':'sales',
   'Marketing & Brand Positioning':'marketing',
-  'Compliance & Governance':'compliance',
-  'Funding Readiness':'funding',
-  'Tender & Procurement Readiness':'tender',
-  'Operations & Systems':'operations',
-  'Growth & Scalability':'growth',
-  'Multiple business areas':'growth'
+  'Funding Readiness':'growth',
+  'Tender & Procurement Readiness':'growth',
+  'Growth & Scalability':'growth'
 };
 
 function packageForRecommendation(rec={}){
@@ -38,8 +46,12 @@ function packageForRecommendation(rec={}){
 function buildQuoteSuggestion(audit={}){
   const primaryRec=Array.isArray(audit.recommendations)&&audit.recommendations.length?audit.recommendations[0]:null;
   const fallbackPriority=Array.isArray(audit.priorities)&&audit.priorities.length?audit.priorities[0]:null;
-  const rec=primaryRec||fallbackPriority||{section:'Business Foundation & Strategy',key:'foundation'};
-  const primary=packageForRecommendation(rec);
+  const rec=primaryRec||fallbackPriority||{section:'Business Foundation',key:'foundation'};
+  let primary=packageForRecommendation(rec);
+  const criticalCount=Array.isArray(audit.criticalCategories)?audit.criticalCategories.length:0;
+  if(audit.priorityIntervention==='30-Day Business Recovery Programme'||criticalCount>=2){
+    primary={code:'retainer-growth',service:'30-Day Business Recovery Programme',amount:2500,scope:'Stabilise the most urgent financial, sales, compliance or operating weaknesses through a focused 30-day implementation plan.',key:'growth'};
+  }
   const supporting=(audit.priorities||[]).filter(p=>p.section!==rec.section).slice(0,2).map(p=>p.section);
   const description=`${primary.service}, recommended from the Business Readiness Audit because ${rec.section||'the highest-priority business area'} requires focused action first.`;
   return {
@@ -48,7 +60,7 @@ function buildQuoteSuggestion(audit={}){
     amount:primary.amount,
     description,
     deliverables:primary.scope,
-    primaryPriority:rec.section||'Business Foundation & Strategy',
+    primaryPriority:rec.section||'Business Foundation',
     supportingPriorities:supporting,
     expiresInDays:14,
     humanReviewRequired:false
