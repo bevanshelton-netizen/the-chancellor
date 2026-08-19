@@ -13,7 +13,15 @@ function verifySecret(secret, stored = '') {
   return actual.length === expectedBuffer.length && crypto.timingSafeEqual(actual, expectedBuffer);
 }
 function accessCode() { return crypto.randomBytes(4).toString('hex').toUpperCase(); }
-function pfEncode(value) { return encodeURIComponent(String(value).trim()).replace(/%20/g, '+'); }
+
+// PayFast custom integrations require PHP-style application/x-www-form-urlencoded
+// encoding when the signature string is created: spaces become '+', percent hex is
+// uppercase, and characters that encodeURIComponent leaves unescaped are encoded.
+function pfEncode(value) {
+  return encodeURIComponent(String(value).trim())
+    .replace(/[!'()*~]/g, char => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+    .replace(/%20/g, '+');
+}
 function payfastSignature(fields, passphrase = '') {
   const body = Object.entries(fields)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -61,4 +69,4 @@ function cleanPublicAudit(a) {
   const { accessHash, ...safe } = a;
   return safe;
 }
-module.exports = { normalise, hashSecret, verifySecret, accessCode, payfastSignature, scoreAudit, cleanPublicAudit, readinessSections };
+module.exports = { normalise, hashSecret, verifySecret, accessCode, pfEncode, payfastSignature, scoreAudit, cleanPublicAudit, readinessSections };
