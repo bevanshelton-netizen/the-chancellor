@@ -2,21 +2,28 @@
   const form=document.getElementById('assessmentForm');
   const questionsEl=document.getElementById('questions');
   const progressBar=document.getElementById('progressBar');
+  const progressText=document.getElementById('progressText');
   const submitBtn=document.getElementById('submitBtn');
   const resultEl=document.getElementById('result');
   const scoreEl=document.getElementById('score');
   const bandEl=document.getElementById('band');
   const meaningEl=document.getElementById('meaning');
-  const prioritiesEl=document.getElementById('priorities');
+  const riskEl=document.getElementById('risk');
+  const opportunityEl=document.getElementById('opportunity');
+  const interventionEl=document.getElementById('intervention');
   const accessNote=document.getElementById('accessNote');
+  const payBtn=document.getElementById('payBtn');
+  const paymentStatus=document.getElementById('paymentStatus');
   let definition=[];
+  let options=[];
 
-  function answeredCount(){
-    return definition.flatMap(s=>s.questions).filter(q=>form.querySelector(`input[name="${q.id}"]:checked`)).length;
-  }
+  function allQuestions(){return definition.flatMap(section=>section.questions)}
+  function answeredCount(){return allQuestions().filter(q=>form.querySelector(`input[name="${q.id}"]:checked`)).length}
   function updateProgress(){
-    const total=definition.flatMap(s=>s.questions).length||1;
-    progressBar.style.width=`${Math.round((answeredCount()/total)*100)}%`;
+    const total=allQuestions().length||1;
+    const answered=answeredCount();
+    progressBar.style.width=`${Math.round((answered/total)*100)}%`;
+    progressText.textContent=`${answered} of ${total} questions answered`;
   }
   function render(){
     questionsEl.innerHTML='';
@@ -27,71 +34,96 @@
       section.questions.forEach((q,n)=>{
         const wrap=document.createElement('div');
         wrap.className='question';
-        wrap.innerHTML=`<div class="qtext">${n+1}. ${q.text}</div><div class="options">
-          <label class="option"><input required type="radio" name="${q.id}" value="0"><span>Not in place</span></label>
-          <label class="option"><input required type="radio" name="${q.id}" value="1"><span>Partially</span></label>
-          <label class="option"><input required type="radio" name="${q.id}" value="2"><span>Clearly in place</span></label>
-        </div>`;
+        const optionHtml=options.map(option=>`<label class="option"><input required type="radio" name="${q.id}" value="${option.value}"><span>${option.label}</span></label>`).join('');
+        wrap.innerHTML=`<div class="qtext">${n+1}. ${q.text}</div><div class="options">${optionHtml}</div>`;
         card.appendChild(wrap);
       });
       questionsEl.appendChild(card);
     });
     form.addEventListener('change',updateProgress);
+    updateProgress();
   }
 
   async function load(){
     const response=await fetch('/api/readiness/definition',{headers:{Accept:'application/json'}});
-    if(!response.ok) throw new Error('Assessment is temporarily unavailable.');
+    if(!response.ok) throw new Error('The Business Growth Audit is temporarily unavailable.');
     const data=await response.json();
     definition=data.sections||[];
+    options=data.options||[
+      {value:0,label:'Not in place'},
+      {value:2,label:'Weak / informal'},
+      {value:3,label:'Working, but inconsistent'},
+      {value:5,label:'Strong and measured'}
+    ];
     render();
   }
 
   function payload(){
     const data=new FormData(form);
     const answers={};
-    definition.flatMap(s=>s.questions).forEach(q=>{answers[q.id]=data.get(q.id);});
+    allQuestions().forEach(q=>{answers[q.id]=data.get(q.id)});
     return {
-      name:data.get('name'),email:data.get('email'),phone:data.get('phone'),businessName:data.get('businessName'),registrationNumber:data.get('registrationNumber'),industry:data.get('industry'),goal:data.get('goal'),answers
+      name:data.get('name'),email:data.get('email'),phone:data.get('phone'),businessName:data.get('businessName'),registrationNumber:data.get('registrationNumber'),industry:data.get('industry'),goal:data.get('goal'),primaryChallenge:data.get('primaryChallenge'),turnoverBand:data.get('turnoverBand'),fundingNeed:data.get('fundingNeed'),implementationIntent:data.get('implementationIntent'),answers
     };
   }
 
   function showResult(data){
     const audit=data.audit||{};
-    scoreEl.textContent=`${audit.score||0}/100`;
-    bandEl.textContent=audit.band||'Readiness result';
+    scoreEl.textContent=`${audit.score||0}/${audit.maxScore||140}`;
+    bandEl.textContent=audit.band||'Business Growth result';
     meaningEl.textContent=audit.bandMeaning||audit.recommendation||'';
-    prioritiesEl.innerHTML='';
-    (audit.recommendations||audit.priorities||[]).slice(0,3).forEach(p=>{
-      const el=document.createElement('div');
-      el.className='priority';
-      const from=p.indicativeFrom?` · services from R${Number(p.indicativeFrom).toLocaleString('en-ZA')}`:'';
-      el.innerHTML=`<strong>${p.priority?`${p.priority}. `:''}${p.section}</strong><br>${p.percent}% ready · ${p.service||'Priority intervention'}${from}<div class="small">${p.summary||''}</div>`;
-      prioritiesEl.appendChild(el);
-    });
+    riskEl.textContent=audit.biggestRisk||audit.priorities?.[0]?.section||'Priority review required.';
+    opportunityEl.textContent=audit.biggestOpportunity||audit.priorities?.[0]?.summary||'Your formal report will identify the strongest commercial opportunity.';
+    interventionEl.textContent=audit.priorityIntervention||audit.recommendedService||'Business Growth intervention';
     accessNote.textContent=data.accessCode?`Save your client access code: ${data.accessCode}. It is shown only once.`:'';
     form.style.display='none';
     resultEl.style.display='block';
     resultEl.scrollIntoView({behavior:'smooth',block:'start'});
   }
 
+  async function startCheckout(){
+    payBtn.disabled=true;
+    payBtn.textContent='Opening secure PayFast checkout…';
+    paymentStatus.textContent='';
+    try{
+      const response=await fetch('/api/payfast/checkout',{method:'POST',headers:{Accept:'application/json'}});
+      const data=await response.json();
+      if(!response.ok) throw new Error(data.error||'Could not start payment.');
+      const checkout=document.createElement('form');
+      checkout.method='POST';
+      checkout.action=data.url;
+      Object.entries(data.fields||{}).forEach(([name,value])=>{
+        const input=document.createElement('input');
+        input.type='hidden';input.name=name;input.value=value;
+        checkout.appendChild(input);
+      });
+      document.body.appendChild(checkout);
+      checkout.submit();
+    }catch(error){
+      paymentStatus.textContent=error.message||'Could not start payment. You can continue through the client portal.';
+      payBtn.disabled=false;
+      payBtn.textContent='Pay R500 Securely with PayFast';
+    }
+  }
+
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     if(!form.reportValidity()) return;
     submitBtn.disabled=true;
-    submitBtn.textContent='Calculating your readiness score…';
+    submitBtn.textContent='Preparing your Business Growth diagnosis…';
     try{
       const response=await fetch('/api/readiness/submit',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(payload())});
       const data=await response.json();
-      if(!response.ok) throw new Error(data.error||'Could not submit the assessment.');
+      if(!response.ok) throw new Error(data.error||'Could not submit the audit.');
       showResult(data);
     }catch(error){
-      alert(error.message||'Could not submit the assessment.');
+      alert(error.message||'Could not submit the audit.');
     }finally{
       submitBtn.disabled=false;
-      submitBtn.textContent='Calculate My Business Readiness Score';
+      submitBtn.textContent='Complete Audit & See My Preliminary Score';
     }
   });
 
+  payBtn.addEventListener('click',startCheckout);
   load().catch(error=>{questionsEl.innerHTML=`<section class="card"><strong>${error.message}</strong></section>`;submitBtn.disabled=true;});
 })();
