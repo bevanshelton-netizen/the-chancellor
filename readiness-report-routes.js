@@ -12,10 +12,16 @@ const AMBER='#B7791F';
 const RED='#A33A3A';
 
 const serviceMap={
-  'Business Foundation':['Business Foundation Pack','Clarify structure, offer, target customer and 12-month priorities.'],
+  'Business Foundation':['Business Foundation & Compliance Pack','Strengthen structure, records, compliance priorities and management foundations.'],
+  'Product / Service':['Offer, Pricing & Profitability Fix','Clarify the offer, improve pricing and focus the business on profitable demand.'],
+  'Sales':['30-Day Sales & Lead Conversion Rescue','Build a repeatable lead, quotation, follow-up and conversion process.'],
+  'Marketing & Brand':['Marketing & Lead Generation','Improve positioning, campaigns, visibility and measurable lead generation.'],
+  'Cash Flow & Finance':['Cash-Flow & Finance Improvement','Strengthen records, margins, collections, cash-flow visibility and management reporting.'],
+  'Customers':['Customer Growth & Retention Pack','Improve customer fit, service, retention, referrals and repeat revenue.'],
+  'Operations':['Operations Improvement Programme','Improve procedures, capacity, supplier controls and service delivery systems.'],
+  'People & Capacity':['People & Capacity Improvement','Clarify roles, accountability, skills gaps and the capacity needed for growth.'],
+  'Growth Readiness':['90-Day Growth Strategy','Turn the strongest opportunities into a practical, measurable growth plan.'],
   'Finance & Cash Flow':['Cash-Flow Improvement','Strengthen records, cash-flow forecasting, costing and financial visibility.'],
-  'Finance & Cash Flow':['Finance & Cash-Flow Improvement','Strengthen records, costing, cash-flow visibility and management reporting.'],
-  'Sales':['Sales Growth System','Build a repeatable lead, quotation, follow-up and customer-retention process.'],
   'Sales & Revenue':['Sales Growth System','Build a repeatable lead, quotation, follow-up and conversion process.'],
   'Marketing':['Marketing & Lead Generation','Strengthen positioning, channels and measurable weekly marketing activity.'],
   'Marketing & Positioning':['Marketing & Lead Generation','Improve positioning, campaigns, lead generation and measurable marketing activity.'],
@@ -24,7 +30,6 @@ const serviceMap={
   'Compliance & Governance':['Compliance Readiness Pack','Organise statutory, contractual and operating compliance requirements.'],
   'Funding Readiness':['Funding Readiness / Investor Pack','Prepare the evidence, business case and supporting documents funders expect.'],
   'Tender & Contract Readiness':['Tender Readiness Package','Build supplier, company-profile, compliance and bid-response readiness.'],
-  'Operations':['Operations Improvement Programme','Document procedures, capacity, supplier controls and service standards.'],
   'Operations & Systems':['Operations Improvement Programme','Improve procedures, capacity, controls and service delivery systems.'],
   'People & Leadership':['People & Leadership Improvement','Clarify roles, performance expectations, skills gaps and management rhythm.'],
   'Customer & Reputation':['Customer Growth & Reputation Pack','Improve retention, service consistency, proof and repeat business.'],
@@ -33,8 +38,8 @@ const serviceMap={
 
 function bandColour(band='',tone=''){
   const value=`${band} ${tone}`.toLowerCase();
-  if(value.includes('green')||value.includes('growth ready'))return GREEN;
-  if(value.includes('amber')||value.includes('nearly')||value.includes('high growth potential'))return AMBER;
+  if(value.includes('scale ready')||value.includes('growth ready')||value.includes('green'))return GREEN;
+  if(value.includes('growth potential')||value.includes('rebuild required')||value.includes('amber')||value.includes('nearly')||value.includes('high growth potential'))return AMBER;
   return RED;
 }
 function safeName(value='business'){
@@ -95,21 +100,24 @@ module.exports=function registerReadinessReportRoutes(app){
     addHeader(doc,audit,crest);
 
     const overallMax=Number(audit.maxScore||90);
+    const readinessPercent=Number.isFinite(Number(audit.readinessPercent))?Number(audit.readinessPercent):Math.round((Number(audit.score||0)/overallMax)*100);
     const colour=bandColour(audit.band,audit.bandTone);
     doc.roundedRect(54,204,doc.page.width-108,110,8).fill(CREAM);
     doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(11).text('OVERALL READINESS',72,222);
     doc.fillColor(colour).fontSize(36).text(`${Number(audit.score||0)}/${overallMax}`,72,242);
-    doc.fillColor(BLACK).fontSize(11).text(`${Number(audit.readinessPercent||0)}% ready`,205,250);
+    doc.fillColor(BLACK).fontSize(11).text(`${readinessPercent}% ready`,205,250);
     doc.fillColor(colour).fontSize(12).text(String(audit.band||'Readiness pending'),205,271,{width:260});
     doc.y=342;
 
     doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(15).text('What this result means');
     doc.moveDown(.35).fillColor(MUTED).font('Helvetica').fontSize(10.5).text(
-      audit.bandMeaning || (String(audit.band||'').toLowerCase().includes('green')
-        ? 'Your business shows a strong readiness foundation. The next focus is targeted optimisation and growth execution.'
-        : String(audit.band||'').toLowerCase().includes('amber')
-        ? 'Your business is viable, but several areas should be strengthened before pursuing bigger opportunities aggressively.'
-        : 'Your business has important readiness gaps that should be addressed before taking on greater financial, contractual or operational risk.'),
+      audit.bandMeaning || (String(audit.band||'').toLowerCase().includes('scale ready')
+        ? 'Your business shows a strong readiness foundation. The next focus is targeted optimisation and disciplined growth execution.'
+        : String(audit.band||'').toLowerCase().includes('growth potential')
+        ? 'Your business has a workable base, but specific bottlenecks should be strengthened before aggressive scaling.'
+        : String(audit.band||'').toLowerCase().includes('rebuild')
+        ? 'Several weaknesses are restricting sustainable growth. Focus on the most important commercial and operating fixes first.'
+        : 'Material readiness gaps require immediate attention before taking on greater financial, contractual or operational risk.'),
       {lineGap:3}
     );
 
@@ -144,7 +152,7 @@ module.exports=function registerReadinessReportRoutes(app){
     });
 
     ensureSpace(doc,180);
-    doc.moveDown(.7).fillColor(BLACK).font('Helvetica-Bold').fontSize(15).text('Recommended next services');
+    doc.moveDown(.7).fillColor(BLACK).font('Helvetica-Bold').fontSize(15).text('The Chancellor’s recommended interventions');
     doc.moveDown(.5);
     const seen=new Set();
     for(const p of (audit.priorities||[]).slice(0,3)){
@@ -153,18 +161,19 @@ module.exports=function registerReadinessReportRoutes(app){
       const summary=p.summary||mapped?.[1];
       if(!service||seen.has(service))continue;
       seen.add(service);
-      ensureSpace(doc,70);
+      ensureSpace(doc,82);
       const y=doc.y;
-      doc.roundedRect(54,y,doc.page.width-108,58,6).strokeColor('#D8CBAF').lineWidth(.7).stroke();
+      doc.roundedRect(54,y,doc.page.width-108,68,6).strokeColor('#D8CBAF').lineWidth(.7).stroke();
       doc.fillColor(GOLD).font('Helvetica-Bold').fontSize(8.5).text(String(p.section).toUpperCase(),68,y+10,{width:420});
       doc.fillColor(BLACK).fontSize(11).text(service,68,y+24,{width:420});
       doc.fillColor(MUTED).font('Helvetica').fontSize(9).text(summary||'',68,y+39,{width:430});
-      doc.y=y+70;
+      if(p.indicativeFrom)doc.fillColor(BLACK).font('Helvetica-Bold').fontSize(9).text(`Indicative intervention from R${Number(p.indicativeFrom).toLocaleString('en-ZA')}`,68,y+54,{width:430});
+      doc.y=y+80;
     }
 
     ensureSpace(doc,120);
     doc.moveDown(.5).fillColor(BLACK).font('Helvetica-Bold').fontSize(15).text('Your immediate next step');
-    doc.moveDown(.35).fillColor(MUTED).font('Helvetica').fontSize(10.5).text(audit.recommendation||'Use this report to focus on the highest-priority gaps, then discuss the most appropriate next intervention with The Chancellor’s Business Growth Desk.',{lineGap:3});
+    doc.moveDown(.35).fillColor(MUTED).font('Helvetica').fontSize(10.5).text(audit.recommendation||'Use this report to focus on the highest-priority gap, implement the recommended fix and measure the result before moving to the next intervention.',{lineGap:3});
     doc.moveDown(1.3).fillColor(BLACK).font('Helvetica-Bold').fontSize(10).text('Important notice');
     doc.moveDown(.2).fillColor(MUTED).font('Helvetica').fontSize(8.5).text('This report is a business-readiness assessment and planning aid. It does not guarantee funding, tenders, contracts, tax outcomes, debt relief, legal outcomes or investment returns. Regulated matters should be handled by appropriately qualified professionals.',{lineGap:2});
     pageFooter(doc);
