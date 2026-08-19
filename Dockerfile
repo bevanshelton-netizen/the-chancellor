@@ -13,4 +13,4 @@ RUN mkdir -p /app/data/uploads /app/data/sessions && chown -R growthdesk:growthd
 USER growthdesk
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD wget -qO- "http://127.0.0.1:${PORT:-3000}/api/health" || exit 1
-CMD ["node", "revenue-server.js"]
+CMD ["node", "render-start.js"]
