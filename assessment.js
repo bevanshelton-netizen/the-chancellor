@@ -16,7 +16,7 @@
   const paymentStatus=document.getElementById('paymentStatus');
   let definition=[];
   let options=[];
-  let maxScore=90;
+  let maxScore=180;
 
   function allQuestions(){return definition.flatMap(section=>section.questions)}
   function answeredCount(){return allQuestions().filter(q=>form.querySelector(`input[name="${q.id}"]:checked`)).length}
@@ -50,7 +50,7 @@
     if(!response.ok) throw new Error('The Business Readiness Audit is temporarily unavailable.');
     const data=await response.json();
     definition=data.sections||[];
-    maxScore=Number(data.maxScore||90);
+    maxScore=Number(data.maxScore||180);
     options=data.options||[
       {value:0,label:'Not in place'},
       {value:1,label:'Partially / inconsistent'},
