@@ -5,12 +5,12 @@ const {scoreReadiness,publicDefinition}=require('./readiness-engine');
 module.exports=function registerReadinessAssessmentRoutes(app){
   app.get('/api/readiness/definition',(_req,res)=>{
     res.setHeader('Cache-Control','no-store');
-    res.json({ok:true,maxScore:100,price:500,currency:'ZAR',sections:publicDefinition()});
+    res.json({ok:true,maxScore:90,price:500,currency:'ZAR',sections:publicDefinition()});
   });
 
   app.post('/api/readiness/preview',(req,res)=>{
     const result=scoreReadiness(req.body||{});
-    res.json({ok:true,score:result.score,maxScore:100,band:result.band,bandCode:result.bandCode,bandMeaning:result.bandMeaning,sections:result.sections,priorities:result.priorities,recommendations:result.recommendations});
+    res.json({ok:true,score:result.score,maxScore:90,readinessPercent:result.readinessPercent,band:result.band,bandCode:result.bandCode,bandTone:result.bandTone,bandMeaning:result.bandMeaning,sections:result.sections,priorities:result.priorities,recommendations:result.recommendations});
   });
 
   app.post('/api/readiness/submit',(req,res)=>{
@@ -32,7 +32,7 @@ module.exports=function registerReadinessAssessmentRoutes(app){
       industry:normalise(req.body.industry),
       goal:normalise(req.body.goal),
       answers,
-      assessmentType:'Business Readiness 100',
+      assessmentType:'Business Readiness 90',
       ...scoring,
       status:'Awaiting payment',
       salesStage:'Audit lead',
