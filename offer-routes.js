@@ -56,6 +56,10 @@ async function validServer(body){
   if(!r.ok)return false;
   return (await r.text()).trim()==='VALID';
 }
+function supersedeAlternativeGrowthOffers(db,paidOffer){
+  if(paidOffer.source!=='growth-tier-engine')return;
+  (db.offers||[]).filter(o=>o.auditId===paidOffer.auditId&&o.id!==paidOffer.id&&o.source==='growth-tier-engine'&&!['Paid','Cancelled','Expired','Superseded'].includes(o.status)).forEach(o=>store.update('offers',o.id,{status:'Superseded',supersededBy:paidOffer.id,supersededAt:new Date().toISOString()}));
+}
 
 module.exports = function registerOfferRoutes(app){
   app.get('/api/admin/offers/catalog', requireAdmin, (_req,res)=>res.json({catalog}));
@@ -85,12 +89,12 @@ module.exports = function registerOfferRoutes(app){
   });
 
   app.post('/api/client/offers/:id/accept', requireClient, (req,res)=>{
-    const db=store.read(),offer=(db.offers||[]).find(o=>o.id===req.params.id&&o.auditId===req.session.clientId);if(!offer)return res.status(404).json({error:'Offer not found.'});if(offer.status==='Paid')return res.json({offer});if(offer.expiresAt&&new Date(offer.expiresAt).getTime()<Date.now())return res.status(410).json({error:'This offer has expired. Please request an updated quote.'});const updated=store.update('offers',offer.id,{status:'Accepted — awaiting payment',acceptedAt:new Date().toISOString()});store.update('audits',offer.auditId,{salesStage:'Offer accepted',nextAction:'Follow-on payment due'});res.json({offer:updated});
+    const db=store.read(),offer=(db.offers||[]).find(o=>o.id===req.params.id&&o.auditId===req.session.clientId);if(!offer)return res.status(404).json({error:'Offer not found.'});if(offer.status==='Paid')return res.json({offer});if(offer.status==='Superseded')return res.status(409).json({error:'Another implementation option has already been selected and paid.'});if(offer.expiresAt&&new Date(offer.expiresAt).getTime()<Date.now())return res.status(410).json({error:'This offer has expired. Please request an updated quote.'});const updated=store.update('offers',offer.id,{status:'Accepted — awaiting payment',acceptedAt:new Date().toISOString()});store.update('audits',offer.auditId,{salesStage:'Offer accepted',nextAction:'Follow-on payment due'});res.json({offer:updated});
   });
 
   app.post('/api/client/offers/:id/checkout', requireClient, (req,res)=>{
     if(!configured())return res.status(503).json({error:'Online payment is not configured on this deployment yet.'});
-    const db=store.read(),offer=(db.offers||[]).find(o=>o.id===req.params.id&&o.auditId===req.session.clientId),audit=(db.audits||[]).find(a=>a.id===req.session.clientId);if(!offer||!audit)return res.status(404).json({error:'Offer not found.'});if(offer.status==='Paid')return res.status(409).json({error:'This offer is already paid.'});if(offer.expiresAt&&new Date(offer.expiresAt).getTime()<Date.now())return res.status(410).json({error:'This offer has expired. Please request an updated quote.'});
+    const db=store.read(),offer=(db.offers||[]).find(o=>o.id===req.params.id&&o.auditId===req.session.clientId),audit=(db.audits||[]).find(a=>a.id===req.session.clientId);if(!offer||!audit)return res.status(404).json({error:'Offer not found.'});if(offer.status==='Paid')return res.status(409).json({error:'This offer is already paid.'});if(offer.status==='Superseded')return res.status(409).json({error:'Another implementation option has already been selected and paid.'});if(offer.expiresAt&&new Date(offer.expiresAt).getTime()<Date.now())return res.status(410).json({error:'This offer has expired. Please request an updated quote.'});
     const base=normalise(process.env.APP_URL||`${req.protocol}://${req.get('host')}`).replace(/\/$/,''),paymentId=`offer-${offer.id}`.slice(0,100);
     const fields={merchant_id:process.env.PAYFAST_MERCHANT_ID,merchant_key:process.env.PAYFAST_MERCHANT_KEY,return_url:`${base}/portal.html?offerPayment=returned`,cancel_url:`${base}/portal.html?offerPayment=cancelled`,notify_url:`${base}/api/offers/payfast/notify`,name_first:audit.name.split(' ')[0],email_address:audit.email,m_payment_id:paymentId,amount:Number(offer.amount).toFixed(2),item_name:offer.service.slice(0,100),custom_str1:offer.id};fields.signature=payfastSignature(fields,process.env.PAYFAST_PASSPHRASE);
     store.insert('offerPayments',{offerId:offer.id,auditId:audit.id,paymentId,amount:money(offer.amount),status:'Initiated',mode:mode()});if(offer.status==='Sent')store.update('offers',offer.id,{status:'Accepted — awaiting payment',acceptedAt:new Date().toISOString()});res.json({url:gateway(),fields});
@@ -105,6 +109,7 @@ module.exports = function registerOfferRoutes(app){
       const payment=(db.offerPayments||[]).slice().reverse().find(p=>p.offerId===offer.id&&p.paymentId===req.body.m_payment_id);if(payment)store.update('offerPayments',payment.id,{status:req.body.payment_status||'COMPLETE',pfPaymentId:req.body.pf_payment_id});
       if(req.body.payment_status==='COMPLETE'){
         const paid=store.update('offers',offer.id,{status:'Paid',paidAt:new Date().toISOString()});
+        supersedeAlternativeGrowthOffers(db,paid);
         store.update('audits',offer.auditId,{salesStage:'Follow-on paid',recommendedService:offer.service,quoteAmount:offer.amount,nextAction:'Begin delivery'});
         ensureAssignment(paid);
       }
