@@ -1,90 +1,78 @@
 const SECTION_DEFS = [
   { key:'foundation', name:'Business Foundation', weight:10, questions:[
-    ['foundation_offer','Our core offer and target customer are clearly defined.'],
-    ['foundation_model','Our business model and revenue streams are clearly understood.'],
-    ['foundation_goals','We have documented 12-month business goals and priorities.'],
-    ['foundation_management','Roles, responsibilities and decision-making are clear.']
+    ['foundation_registration','Our business registration, ownership structure and banking arrangements are in order.'],
+    ['foundation_compliance','We know which statutory, tax and industry compliance requirements apply to us.'],
+    ['foundation_goals','We have clear 12-month business goals and immediate priorities.'],
+    ['foundation_management','Roles, responsibilities and decision-making are clear.'],
+    ['foundation_records','Important company, supplier and operating records are organised and current.']
   ]},
-  { key:'finance', name:'Finance & Cash Flow', weight:10, questions:[
-    ['finance_records','Our bookkeeping and financial records are current.'],
-    ['finance_cashflow','We actively monitor cash flow and future cash needs.'],
-    ['finance_costing','We understand gross margin, costing and profitability by product/service.'],
-    ['finance_budget','We use a budget or management accounts to guide decisions.']
+  { key:'offering', name:'Product / Service', weight:10, questions:[
+    ['offering_clarity','Our main product or service and the problem it solves are clearly defined.'],
+    ['offering_demand','We have evidence that customers genuinely want or need what we sell.'],
+    ['offering_pricing','Our pricing is based on costs, margin and customer value rather than guesswork.'],
+    ['offering_margin','We know which products or services are most profitable.'],
+    ['offering_focus','We know which offers should receive the most sales and marketing attention.']
   ]},
-  { key:'sales', name:'Sales & Revenue', weight:10, questions:[
+  { key:'sales', name:'Sales', weight:10, questions:[
     ['sales_pipeline','We have a visible pipeline of leads and opportunities.'],
-    ['sales_process','We follow a consistent sales and quotation process.'],
-    ['sales_followup','We systematically follow up quotes and prospects.'],
-    ['sales_targets','We track sales targets, conversion and revenue performance.']
+    ['sales_process','We follow a consistent sales, quotation and closing process.'],
+    ['sales_followup','We systematically follow up quotations and prospects.'],
+    ['sales_targets','We track sales targets, conversion and revenue performance.'],
+    ['sales_activity','We carry out deliberate sales activity every week.']
   ]},
-  { key:'marketing', name:'Marketing & Positioning', weight:8, questions:[
-    ['marketing_position','Our positioning and value proposition are clear.'],
+  { key:'marketing', name:'Marketing & Brand', weight:10, questions:[
+    ['marketing_position','Our brand and value proposition clearly explain why customers should choose us.'],
+    ['marketing_presence','Our website, social channels or other public presence look credible and current.'],
     ['marketing_plan','We have a practical marketing plan and regular activity.'],
-    ['marketing_leads','We know which marketing channels generate qualified leads.'],
-    ['marketing_measure','We measure marketing results and return on spend.']
+    ['marketing_leads','We know which channels generate qualified enquiries.'],
+    ['marketing_measure','We measure marketing results and improve what is not working.']
   ]},
-  { key:'digital', name:'Digital Presence', weight:8, questions:[
-    ['digital_web','We have a credible website or professional online presence.'],
-    ['digital_social','Our social channels are current, consistent and branded.'],
-    ['digital_conversion','Our digital channels make it easy to enquire, buy or book.'],
-    ['digital_data','We use digital tools to capture customer and lead data.']
+  { key:'finance', name:'Cash Flow & Finance', weight:10, questions:[
+    ['finance_records','Our bookkeeping and financial records are current.'],
+    ['finance_cashflow','We actively monitor cash coming in, cash going out and future cash needs.'],
+    ['finance_margin','We understand gross margin, costing and profitability.'],
+    ['finance_collections','We have a disciplined invoicing and debt-collection process.'],
+    ['finance_budget','We use a budget, management accounts or similar information to guide decisions.']
   ]},
-  { key:'compliance', name:'Compliance & Governance', weight:10, questions:[
-    ['compliance_registration','Business registrations and statutory records are in order.'],
-    ['compliance_tax','Tax and required filings are current or under active professional management.'],
-    ['compliance_contracts','We use appropriate contracts, terms and records.'],
-    ['compliance_risk','We understand our key legal, regulatory and operating risks.']
+  { key:'customers', name:'Customers', weight:10, questions:[
+    ['customers_target','We clearly know our ideal and most valuable customers.'],
+    ['customers_service','We have a consistent customer service process.'],
+    ['customers_retention','We actively retain, repeat-sell or cross-sell existing customers.'],
+    ['customers_referrals','We deliberately ask for referrals, reviews or testimonials.'],
+    ['customers_feedback','We capture customer feedback and act on recurring issues.']
   ]},
-  { key:'funding', name:'Funding Readiness', weight:8, questions:[
-    ['funding_need','We know exactly how much funding we need and what it will be used for.'],
-    ['funding_financials','We can provide current financial statements or credible management accounts.'],
-    ['funding_case','We can clearly explain the commercial case, repayment or investor return.'],
-    ['funding_pack','We have supporting documents funders or investors are likely to request.']
-  ]},
-  { key:'tender', name:'Tender & Contract Readiness', weight:8, questions:[
-    ['tender_profile','We have a current company/capability profile.'],
-    ['tender_supplier','Supplier registrations and compliance documents are maintained.'],
-    ['tender_response','We can prepare compliant bids and quotations before deadlines.'],
-    ['tender_capacity','We can prove capacity, references and delivery capability.']
-  ]},
-  { key:'operations', name:'Operations & Systems', weight:8, questions:[
+  { key:'operations', name:'Operations', weight:10, questions:[
     ['operations_process','Key operating procedures are documented and repeatable.'],
     ['operations_capacity','We understand current capacity and bottlenecks.'],
-    ['operations_quality','Quality and service standards are monitored.'],
-    ['operations_tools','We use suitable systems to manage work, customers and records.']
+    ['operations_suppliers','Important suppliers and service providers are reliable and managed.'],
+    ['operations_quality','Quality, turnaround times and service standards are monitored.'],
+    ['operations_tools','We use suitable systems and technology to manage work, customers and records.']
   ]},
-  { key:'people', name:'People & Leadership', weight:6, questions:[
+  { key:'people', name:'People & Capacity', weight:10, questions:[
     ['people_roles','Team roles and performance expectations are clear.'],
     ['people_skills','Critical skills gaps are known and being addressed.'],
-    ['people_leadership','Leadership reviews performance and follows through on priorities.'],
-    ['people_continuity','The business can operate without depending on one person for everything.']
+    ['people_accountability','People are held accountable for agreed actions and results.'],
+    ['people_owner_dependence','The business can operate without the owner being involved in every task.'],
+    ['people_capacity','We know what people, outsourcing or capacity will be needed to grow.']
   ]},
-  { key:'customer', name:'Customer & Reputation', weight:6, questions:[
-    ['customer_fit','We know who our most profitable or valuable customers are.'],
-    ['customer_service','We have a consistent customer service process.'],
-    ['customer_retention','We actively retain, repeat-sell or cross-sell existing customers.'],
-    ['customer_proof','We can show references, testimonials, case studies or proof of delivery.']
-  ]},
-  { key:'growth', name:'Growth Potential', weight:8, questions:[
+  { key:'growth', name:'Growth Readiness', weight:10, questions:[
     ['growth_opportunity','We can identify the next realistic growth opportunities.'],
-    ['growth_capacity','We know what capacity, capital or capability growth will require.'],
-    ['growth_metrics','We track the measures that tell us whether growth is healthy.'],
+    ['growth_capacity','We know what capital, capacity and capability growth will require.'],
+    ['growth_funding','We can explain how much funding or investment is required and what it would achieve, if funding is needed.'],
+    ['growth_contracts','We are able to demonstrate delivery capability for larger customers, contracts or opportunities.'],
     ['growth_plan','We have a practical 90-day growth execution plan.']
   ]}
 ];
 
 const SERVICE_MAP = {
-  foundation:{service:'Business Foundation Pack',category:'Strategy',indicativeFrom:3500,summary:'Clarify the offer, target market, business model and execution priorities.'},
-  finance:{service:'Finance & Cash-Flow Improvement',category:'Finance',indicativeFrom:4500,summary:'Strengthen records, costing, cash-flow visibility and management reporting.'},
-  sales:{service:'Sales Growth System',category:'Sales',indicativeFrom:5000,summary:'Build a repeatable lead, quotation, follow-up and conversion process.'},
-  marketing:{service:'Marketing & Lead Generation',category:'Marketing',indicativeFrom:5000,summary:'Improve positioning, campaigns, lead generation and measurable marketing activity.'},
-  digital:{service:'Digital Presence Upgrade',category:'Digital',indicativeFrom:5000,summary:'Strengthen website, digital credibility, lead capture and conversion paths.'},
-  compliance:{service:'Compliance Readiness Pack',category:'Compliance',indicativeFrom:3500,summary:'Organise statutory, contractual and operating compliance requirements.'},
-  funding:{service:'Funding Readiness / Investor Pack',category:'Funding',indicativeFrom:7500,summary:'Prepare the business case, evidence and supporting documents expected by funders.'},
-  tender:{service:'Tender Readiness Package',category:'Tender',indicativeFrom:4500,summary:'Build supplier, profile, compliance and bid-response readiness.'},
-  operations:{service:'Operations Improvement Programme',category:'Operations',indicativeFrom:5000,summary:'Improve procedures, capacity, controls and service delivery systems.'},
-  people:{service:'People & Leadership Improvement',category:'People',indicativeFrom:4500,summary:'Clarify roles, performance expectations, skills gaps and management rhythm.'},
-  customer:{service:'Customer Growth & Reputation Pack',category:'Customer',indicativeFrom:3500,summary:'Improve retention, service consistency, proof, testimonials and repeat business.'},
+  foundation:{service:'Business Foundation & Compliance Pack',category:'Foundation',indicativeFrom:3500,summary:'Strengthen structure, records, compliance priorities and management foundations.'},
+  offering:{service:'Offer, Pricing & Profitability Fix',category:'Commercial',indicativeFrom:3500,summary:'Clarify the offer, improve pricing and focus the business on profitable demand.'},
+  sales:{service:'30-Day Sales & Lead Conversion Rescue',category:'Sales',indicativeFrom:3500,summary:'Build a repeatable lead, quotation, follow-up and conversion process.'},
+  marketing:{service:'Marketing & Lead Generation',category:'Marketing',indicativeFrom:3500,summary:'Improve positioning, campaigns, visibility and measurable lead generation.'},
+  finance:{service:'Cash-Flow & Finance Improvement',category:'Finance',indicativeFrom:3500,summary:'Strengthen records, margins, collections, cash-flow visibility and management reporting.'},
+  customers:{service:'Customer Growth & Retention Pack',category:'Customers',indicativeFrom:3500,summary:'Improve customer fit, service, retention, referrals and repeat revenue.'},
+  operations:{service:'Operations Improvement Programme',category:'Operations',indicativeFrom:5000,summary:'Improve procedures, capacity, supplier controls and service delivery systems.'},
+  people:{service:'People & Capacity Improvement',category:'People',indicativeFrom:4500,summary:'Clarify roles, accountability, skills gaps and the capacity needed for growth.'},
   growth:{service:'90-Day Growth Strategy',category:'Growth',indicativeFrom:7500,summary:'Turn the strongest opportunities into a practical, measurable growth plan.'}
 };
 
@@ -96,10 +84,10 @@ function answerValue(value){
 }
 
 function bandFor(score){
-  if(score >= 80) return {code:'GROWTH_READY',label:'Growth Ready',tone:'green',meaning:'Strong platform for targeted scaling and optimisation.'};
-  if(score >= 60) return {code:'NEARLY_READY',label:'Nearly Growth Ready',tone:'amber',meaning:'The business is viable, with several gaps to strengthen before aggressive scaling.'};
-  if(score >= 40) return {code:'HIGH_POTENTIAL_NOT_READY',label:'High Growth Potential — Not Yet Growth Ready',tone:'amber',meaning:'There is meaningful potential, but core weaknesses could constrain growth or increase risk.'};
-  return {code:'FOUNDATION_FIRST',label:'Foundation First',tone:'red',meaning:'Important readiness gaps should be addressed before taking on greater financial or operational risk.'};
+  if(score >= 70) return {code:'SCALE_READY',label:'SCALE READY',tone:'green',meaning:'The business has a strong foundation. Focus on targeted expansion, stronger revenue and disciplined scaling.'};
+  if(score >= 50) return {code:'GROWTH_POTENTIAL',label:'GROWTH POTENTIAL',tone:'amber',meaning:'The business has a workable base, but identifiable bottlenecks should be strengthened before aggressive scaling.'};
+  if(score >= 30) return {code:'REBUILD_REQUIRED',label:'REBUILD REQUIRED',tone:'amber',meaning:'Several weaknesses are restricting sustainable growth. Prioritise the most important commercial and operating fixes first.'};
+  return {code:'URGENT_ACTION_REQUIRED',label:'URGENT ACTION REQUIRED',tone:'red',meaning:'Material business-readiness gaps require immediate attention before taking on greater financial or operating risk.'};
 }
 
 function scoreReadiness(input={}){
@@ -113,6 +101,8 @@ function scoreReadiness(input={}){
     sections[section.name]={key:section.key,score:weighted,maxScore:section.weight,percent,raw,rawMax};
   }
   const score=Math.round(Object.values(sections).reduce((sum,s)=>sum+s.score,0));
+  const maxScore=90;
+  const readinessPercent=Math.round((score/maxScore)*100);
   const band=bandFor(score);
   const priorities=Object.values(sections)
     .sort((a,b)=>a.percent-b.percent || b.maxScore-a.maxScore)
@@ -120,8 +110,8 @@ function scoreReadiness(input={}){
     .map(s=>({section:Object.keys(sections).find(name=>sections[name]===s),key:s.key,score:s.score,maxScore:s.maxScore,percent:s.percent,...SERVICE_MAP[s.key]}));
   const recommendations=priorities.map((p,index)=>({priority:index+1,...p}));
   const strongest=Object.entries(sections).sort((a,b)=>b[1].percent-a[1].percent).slice(0,3).map(([section,s])=>({section,...s}));
-  const recommendation=`Focus first on ${priorities.map(p=>p.section).join(', ')}. Complete the highest-priority intervention before committing major resources to expansion, funding or large contracts.`;
-  return {score,maxScore:100,readinessPercent:score,band:band.label,bandCode:band.code,bandTone:band.tone,bandMeaning:band.meaning,sections,sectionScores:Object.fromEntries(Object.entries(sections).map(([name,s])=>[name,s.score])),priorities,recommendations,strongest,recommendation,engineVersion:'100.1'};
+  const recommendation=`Focus first on ${priorities.map(p=>p.section).join(', ')}. Solve the highest-priority constraint, measure the result, then move to the next intervention.`;
+  return {score,maxScore,readinessPercent,band:band.label,bandCode:band.code,bandTone:band.tone,bandMeaning:band.meaning,sections,sectionScores:Object.fromEntries(Object.entries(sections).map(([name,s])=>[name,s.score])),priorities,recommendations,strongest,recommendation,engineVersion:'90.2'};
 }
 
 function publicDefinition(){
