@@ -16,7 +16,7 @@
   const paymentStatus=document.getElementById('paymentStatus');
   let definition=[];
   let options=[];
-  let maxScore=90;
+  let maxScore=225;
 
   function allQuestions(){return definition.flatMap(section=>section.questions)}
   function answeredCount(){return allQuestions().filter(q=>form.querySelector(`input[name="${q.id}"]:checked`)).length}
@@ -50,11 +50,13 @@
     if(!response.ok) throw new Error('The Business Readiness Audit is temporarily unavailable.');
     const data=await response.json();
     definition=data.sections||[];
-    maxScore=Number(data.maxScore||90);
+    maxScore=Number(data.maxScore||225);
     options=data.options||[
-      {value:0,label:'Not in place'},
-      {value:1,label:'Partially / inconsistent'},
-      {value:2,label:'Clearly in place'}
+      {value:1,label:'Not in place'},
+      {value:2,label:'Very weak'},
+      {value:3,label:'Partly in place'},
+      {value:4,label:'Strong'},
+      {value:5,label:'Fully in place and working well'}
     ];
     render();
   }
@@ -70,7 +72,8 @@
 
   function showResult(data){
     const audit=data.audit||{};
-    scoreEl.textContent=`${audit.score||0}/${audit.maxScore||maxScore}`;
+    const percent=Number(audit.readinessPercent||0);
+    scoreEl.textContent=`${percent}% (${audit.score||0}/${audit.maxScore||maxScore})`;
     bandEl.textContent=audit.band||'Business Readiness result';
     meaningEl.textContent=audit.bandMeaning||audit.recommendation||'';
     riskEl.textContent=audit.biggestRisk||audit.priorities?.[0]?.section||'Priority review required.';

@@ -1,23 +1,58 @@
 const packages={
-  'Business Foundation':{code:'business-proposal',service:'Business Foundation & Positioning Pack',amount:3500,scope:'Clarify the business offer, target customer, positioning, 12-month priorities and core business narrative.'},
-  'Finance & Cash Flow':{code:'retainer-starter',service:'Cash-Flow & Management Improvement Sprint',amount:2500,scope:'Strengthen financial visibility, cash-flow planning, costing discipline and management routines.'},
-  'Sales':{code:'retainer-growth',service:'Sales Growth System',amount:4500,scope:'Build a practical lead pipeline, quotation follow-up process, sales targets and customer-retention rhythm.'},
-  'Marketing':{code:'marketing-plan',service:'Marketing & Lead Generation Plan',amount:3500,scope:'Clarify market positioning, channels, weekly campaigns, lead generation and measurement.'},
-  'Compliance':{code:'capability',service:'Business Compliance Readiness Pack',amount:2500,scope:'Organise the business compliance checklist, operating records and contract-readiness documents; regulated advice is referred where required.'},
-  'Funding Readiness':{code:'funding-proposal',service:'Funding Readiness Pack',amount:6500,scope:'Prepare the funding case, use-of-funds narrative, supporting document checklist and funder-ready proposal structure.'},
-  'Tender & Contract Readiness':{code:'tender-support',service:'Tender & Contract Readiness Package',amount:6500,scope:'Strengthen supplier readiness, company profile, compliance pack, bid response process and pricing discipline.'},
-  'Operations':{code:'retainer-growth',service:'Operations Improvement Programme',amount:4500,scope:'Document priority procedures, capacity controls, supplier routines, service standards and operational accountability.'},
-  'Growth Potential':{code:'retainer-growth',service:'90-Day Growth Strategy',amount:4500,scope:'Define the strongest expansion opportunities and convert them into a 90-day capacity, sales and execution plan.'}
+  foundation:{code:'business-proposal',service:'Growth Strategy Session',amount:1250,scope:'Clarify the business foundation, priorities and a practical 30–90 day growth direction.'},
+  finance:{code:'retainer-starter',service:'Financial & Cash-Flow Readiness Intervention',amount:2500,scope:'Improve financial visibility, records, budgeting, collections and cash-flow control.'},
+  sales:{code:'marketing-plan',service:'Sales & Marketing Growth Plan',amount:2500,scope:'Build a repeatable lead-generation, follow-up, conversion and sales-target process.'},
+  marketing:{code:'marketing-plan',service:'Brand & Market Positioning Intervention',amount:2500,scope:'Strengthen positioning, brand credibility, visibility and customer acquisition.'},
+  compliance:{code:'capability',service:'Business Compliance Rescue',amount:1500,scope:'Identify and prioritise registration, tax, licensing, contractual and governance gaps; regulated advice is referred where required.'},
+  funding:{code:'funding-proposal',service:'Funding Readiness Package',amount:3500,scope:'Prepare the business case, numbers, use-of-funds and supporting documentation for funding discussions.'},
+  tender:{code:'tender-support',service:'Tender Readiness Package',amount:2500,scope:'Strengthen supplier readiness, documentation, quotation quality, bid preparation and contract-delivery capability.'},
+  operations:{code:'retainer-growth',service:'Operations & Systems Improvement Plan',amount:3500,scope:'Improve processes, tracking, record-keeping, capacity controls and service delivery.'},
+  growth:{code:'retainer-executive',service:'Growth Accelerator',amount:7500,scope:'Turn multiple growth constraints into a coordinated implementation programme focused on stability, revenue and scale readiness.'}
 };
 
-function buildQuoteSuggestion(audit={}){
-  const priorities=Array.isArray(audit.priorities)?audit.priorities:[];
-  const primary=priorities.map(p=>packages[p.section]).find(Boolean)||packages['Business Foundation'];
-  const supporting=priorities.slice(1,3).map(p=>packages[p.section]).filter(Boolean);
-  const extras=supporting.map(x=>x.service).filter(x=>x!==primary.service);
-  const deliverables=[primary.scope,...supporting.map(x=>x.scope)].filter(Boolean).join(' ');
-  const description=extras.length?`${primary.service}, with supporting attention to ${extras.join(' and ')} based on the Business Readiness Audit.`:`${primary.service}, recommended from the Business Readiness Audit.`;
-  return {code:primary.code,service:primary.service,amount:primary.amount,description,deliverables,primaryPriority:priorities[0]?.section||'Business Foundation',supportingPriorities:priorities.slice(1,3).map(p=>p.section),expiresInDays:14,humanReviewRequired:true};
+const sectionKeys={
+  'Business Foundation & Strategy':'foundation',
+  'Financial Readiness':'finance',
+  'Sales & Customer Acquisition':'sales',
+  'Marketing & Brand Positioning':'marketing',
+  'Compliance & Governance':'compliance',
+  'Funding Readiness':'funding',
+  'Tender & Procurement Readiness':'tender',
+  'Operations & Systems':'operations',
+  'Growth & Scalability':'growth',
+  'Multiple business areas':'growth'
+};
+
+function packageForRecommendation(rec={}){
+  const key=rec.key||sectionKeys[rec.section];
+  const base=packages[key]||packages.foundation;
+  return {
+    ...base,
+    service:rec.service||base.service,
+    amount:Number(rec.indicativeFrom||base.amount),
+    scope:rec.summary||base.scope,
+    key:key||'foundation'
+  };
 }
 
-module.exports={packages,buildQuoteSuggestion};
+function buildQuoteSuggestion(audit={}){
+  const primaryRec=Array.isArray(audit.recommendations)&&audit.recommendations.length?audit.recommendations[0]:null;
+  const fallbackPriority=Array.isArray(audit.priorities)&&audit.priorities.length?audit.priorities[0]:null;
+  const rec=primaryRec||fallbackPriority||{section:'Business Foundation & Strategy',key:'foundation'};
+  const primary=packageForRecommendation(rec);
+  const supporting=(audit.priorities||[]).filter(p=>p.section!==rec.section).slice(0,2).map(p=>p.section);
+  const description=`${primary.service}, recommended from the Business Readiness Audit because ${rec.section||'the highest-priority business area'} requires focused action first.`;
+  return {
+    code:primary.code,
+    service:primary.service,
+    amount:primary.amount,
+    description,
+    deliverables:primary.scope,
+    primaryPriority:rec.section||'Business Foundation & Strategy',
+    supportingPriorities:supporting,
+    expiresInDays:14,
+    humanReviewRequired:false
+  };
+}
+
+module.exports={packages,sectionKeys,packageForRecommendation,buildQuoteSuggestion};
