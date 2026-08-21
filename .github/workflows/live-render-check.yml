@@ -2,44 +2,66 @@ name: Live Render Verification
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Chancellor v1 CI"]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
   verify-live:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
-      - name: Verify live Render production
+      - name: Verify exact commit on live Render production
         shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
           BASE='https://the-chancellor.onrender.com'
           echo "Verifying $BASE"
+          echo "Expected production commit: $EXPECTED_SHA"
 
-          ready=0
-          for i in $(seq 1 30); do
-            code=$(curl -L -sS -o /tmp/health.json -w '%{http_code}' "$BASE/api/health" || true)
-            echo "Attempt $i: health HTTP $code"
-            if [ "$code" = '200' ] && grep -q '"ok":true' /tmp/health.json; then
-              ready=1
+          deployed=0
+          for i in $(seq 1 72); do
+            hcode=$(curl -L --connect-timeout 10 --max-time 25 -sS -o /tmp/health.json -w '%{http_code}' "$BASE/api/health" || true)
+            gcode=$(curl -L --connect-timeout 10 --max-time 25 -sS -o /tmp/go-live.json -w '%{http_code}' "$BASE/api/go-live" || true)
+            live_sha=$(jq -r '.deployment.commit // ""' /tmp/go-live.json 2>/dev/null || true)
+            ready=$(jq -r '.readyForPaidTraffic // false' /tmp/go-live.json 2>/dev/null || echo false)
+            blockers=$(jq -c '.blockers // []' /tmp/go-live.json 2>/dev/null || echo '[]')
+            echo "Attempt $i: health=$hcode go-live=$gcode commit=${live_sha:0:8} ready=$ready blockers=$blockers"
+            if [ "$hcode" = '200' ] && grep -q '"ok":true' /tmp/health.json \
+              && [ "$gcode" = '200' ] && [ "$ready" = 'true' ] \
+              && [ "$live_sha" = "$EXPECTED_SHA" ]; then
+              deployed=1
               break
             fi
             sleep 10
           done
 
-          if [ "$ready" -ne 1 ]; then
-            echo 'Render did not become healthy within the verification window.'
+          if [ "$deployed" -ne 1 ]; then
+            echo 'Render did not reach the exact paid-traffic-ready commit within the verification window.'
+            echo 'Last health response:'
             cat /tmp/health.json 2>/dev/null || true
+            echo
+            echo 'Last go-live response:'
+            cat /tmp/go-live.json 2>/dev/null || true
             exit 1
           fi
+
+          jq -e '.audit.sections == 9 and .audit.questions == 90 and .audit.maxScore == 180' /tmp/go-live.json >/dev/null
+          jq -e '.implementation.tiers == [3500,7500,10000]' /tmp/go-live.json >/dev/null
+          jq -e '.payment.mode == "live" and .payment.configured == true' /tmp/go-live.json >/dev/null
 
           check_page () {
             path="$1"
             needle="$2"
             out="$3"
-            code=$(curl -L -sS -o "$out" -w '%{http_code}' "$BASE$path" || true)
+            code=$(curl -L --connect-timeout 10 --max-time 25 -sS -o "$out" -w '%{http_code}' "$BASE$path" || true)
             echo "$path -> HTTP $code"
             [ "$code" = '200' ]
             grep -Fq "$needle" "$out"
@@ -47,7 +69,7 @@ jobs:
 
           check_asset () {
             path="$1"
-            code=$(curl -L -sS -o /tmp/asset.bin -w '%{http_code}' "$BASE$path" || true)
+            code=$(curl -L --connect-timeout 10 --max-time 25 -sS -o /tmp/asset.bin -w '%{http_code}' "$BASE$path" || true)
             bytes=$(wc -c < /tmp/asset.bin 2>/dev/null || echo 0)
             echo "$path -> HTTP $code, $bytes bytes"
             [ "$code" = '200' ]
@@ -56,14 +78,13 @@ jobs:
 
           check_page '/' 'Start the R500 Business Readiness Audit' /tmp/home.html
           grep -Fq '/assets/chancellor-approved-live.webp' /tmp/home.html
-
           check_page '/campaign.html?focus=growth&utm_source=verification' 'R500 Business Readiness Audit' /tmp/campaign.html
           grep -Fq '/assets/chancellor-approved-live.webp' /tmp/campaign.html
           grep -Fq '/brand/crest.jpg' /tmp/campaign.html
-
+          check_page '/assessment.html' '180' /tmp/assessment.html
           check_page '/portal.html' 'Client' /tmp/portal.html
           check_asset '/assets/chancellor-approved-live.webp?v=live-check'
           check_asset '/brand/crest.jpg?v=live-check'
 
           echo 'LIVE_RENDER_VERIFICATION=PASS'
-          echo 'Homepage, campaign, portal, health, portrait and crest all passed.'
+          echo "Render is serving $EXPECTED_SHA with paid-traffic readiness, the 180-point audit and all three implementation tiers."
