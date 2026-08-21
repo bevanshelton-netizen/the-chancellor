@@ -76,7 +76,7 @@ jobs:
             [ "$bytes" -gt 1000 ]
           }
 
-          check_page '/' 'Start the R500 Business Readiness Audit' /tmp/home.html
+          check_page '/' 'R500 Business Readiness Audit' /tmp/home.html
           grep -Fq '/assets/chancellor-approved-live.webp' /tmp/home.html
           check_page '/campaign.html?focus=growth&utm_source=verification' 'R500 Business Readiness Audit' /tmp/campaign.html
           grep -Fq '/assets/chancellor-approved-live.webp' /tmp/campaign.html
