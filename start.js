@@ -13,6 +13,7 @@ function mount(modulePath,label=modulePath){
 }
 
 mount('./brand-fallback-routes','brand fallbacks');
+mount('./client-access-recovery-routes','client access recovery');
 mount('./membership-routes','membership');
 mount('./firm-routes','firms');
 mount('./case-room-routes','case room');
