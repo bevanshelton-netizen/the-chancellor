@@ -13,7 +13,14 @@
     try{
       const body=Object.fromEntries(new FormData(form));
       const response=await fetch('/api/auth/client/recover',{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body)});
-      const data=await response.json();
+      const type=String(response.headers.get('content-type')||'').toLowerCase();
+      let data={};
+      if(type.includes('application/json')) data=await response.json();
+      else {
+        const text=await response.text();
+        if(text.trim().startsWith('<')) throw new Error('The recovery service is updating. Refresh this page once and press Restore my audit access again.');
+        throw new Error(text.trim()||'Could not restore access.');
+      }
       if(!response.ok)throw new Error(data.error||'Could not restore access.');
       sessionStorage.setItem('newAccessCode',data.accessCode);
       codeEl.textContent=data.accessCode;
