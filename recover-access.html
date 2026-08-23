@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recover Client Access · The Chancellor</title>
+<link rel="stylesheet" href="styles.css?v=20260813-1">
+<style>
+body{background:#0b0a09;color:#f4efe4}.recover-shell{max-width:680px;margin:0 auto;padding:32px 16px 70px}.recover-card{background:#15130f;border:1px solid #3a3328;border-radius:18px;padding:24px}.recover-card h1{font-family:Georgia,serif;margin:6px 0 12px}.recover-card label{display:block;margin:14px 0;color:#d8cfbf}.recover-card input{width:100%;margin-top:6px;padding:13px;border-radius:10px;border:1px solid #4b4335;background:#0d0c0a;color:#fff}.recover-card .button{width:100%;margin-top:10px}.code-box{display:none;margin-top:18px;padding:18px;border:1px solid #c9a653;border-radius:14px;background:rgba(201,166,83,.09)}.code-box strong{display:block;font-size:30px;letter-spacing:.08em;color:#f4d77f;margin:8px 0}.status{margin-top:12px}.muted{color:#b9ad96}.brandline{color:#c9a653;letter-spacing:.14em;text-transform:uppercase;font-size:12px}
+</style>
+</head>
+<body>
+<main class="recover-shell">
+<section class="recover-card">
+<div class="brandline">The Chancellor's Business Growth Desk</div>
+<h1>Recover your existing audit</h1>
+<p class="muted">You do not need to complete the 90-question audit again. Enter the same details you used when you submitted it.</p>
+<form id="recoverForm">
+<label>Your name<input name="name" autocomplete="name" required></label>
+<label>Email address<input name="email" type="email" autocomplete="email" required></label>
+<label>Phone / WhatsApp number<input name="phone" autocomplete="tel" required></label>
+<label>Business name<input name="businessName" required></label>
+<button class="button" id="recoverButton" type="submit">Restore my audit access</button>
+<p id="recoverStatus" class="status"></p>
+</form>
+<div class="code-box" id="codeBox">
+<div class="brandline">New access code</div>
+<strong id="newAccessCode"></strong>
+<p>Save this code. Your existing audit is already open in this secure session.</p>
+<a class="button" href="/portal.html">Continue to my R500 payment</a>
+</div>
+</section>
+</main>
+<script src="recover-access.js?v=20260823-1"></script>
+</body>
+</html>
