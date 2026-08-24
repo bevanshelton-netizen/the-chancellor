@@ -1,4 +1,7 @@
 require('dotenv').config({ path: require('node:path').join(__dirname, '.env') });
+for (const key of ['PAYFAST_MODE','PAYFAST_MERCHANT_ID','PAYFAST_MERCHANT_KEY','PAYFAST_PASSPHRASE','APP_URL']) {
+  if (typeof process.env[key] === 'string') process.env[key] = process.env[key].trim();
+}
 const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
