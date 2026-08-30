@@ -20,6 +20,14 @@
   });
   window.CHANCELLOR_CHARACTER=CHARACTER;
 
+  function ensurePresenceController(){
+    if(window.ChancellorPresence||document.querySelector('script[data-chancellor-presence]'))return;
+    const script=document.createElement('script');
+    script.src='/chancellor-presence.js?v=20260830-1';
+    script.defer=true;
+    script.dataset.chancellorPresence='1';
+    document.head.appendChild(script);
+  }
   function show(el){
     if(!el)return;
     if(el.getAttribute('src')!==APPROVED)el.setAttribute('src',APPROVED);
@@ -46,6 +54,7 @@
     document.querySelectorAll('.chancellor-portrait,.rescue-portrait,.avatar-img,.campaign-identity img').forEach(show);
     document.querySelectorAll('.crest-logo').forEach(repairCrest);
     loadRescueLayoutFix();
+    ensurePresenceController();
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});
