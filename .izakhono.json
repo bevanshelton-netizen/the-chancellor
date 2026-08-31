@@ -11,5 +11,10 @@
     "preflight": true,
     "rehearsal": false,
     "windows_package": false
+  },
+  "commercial": {
+    "readiness_required": true,
+    "readiness_path": "/api/go-live",
+    "readiness_field": "readyForPaidTraffic"
   }
 }
