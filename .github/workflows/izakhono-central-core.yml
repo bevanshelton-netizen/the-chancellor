@@ -1,0 +1,31 @@
+name: IZAKHONO Central Alpha Core
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.izakhono.json'
+      - 'Dockerfile'
+      - 'package.json'
+      - 'revenue-server.js'
+      - 'scripts/izakhono/**'
+      - '.github/workflows/izakhono-central-core.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.izakhono.json'
+      - 'Dockerfile'
+      - 'package.json'
+      - 'revenue-server.js'
+      - 'scripts/izakhono/**'
+      - '.github/workflows/izakhono-central-core.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  alpha-core:
+    uses: bevanshelton-netizen/izakhono-builder/.github/workflows/izakhono-build-to-alpha.yml@main
+    with:
+      manifest_path: .izakhono.json
