@@ -8,7 +8,7 @@
     "start": "node revenue-server.js",
     "dev": "node --watch revenue-server.js",
     "test": "node tests/core.test.js",
-    "deploy:check": "node deploy-check.js"
+    "deploy:check": "node scripts/identity-gate.js && node deploy-check.js"
   },
   "engines": { "node": ">=20" },
   "dependencies": {
