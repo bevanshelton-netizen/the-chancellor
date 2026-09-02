@@ -1,0 +1,24 @@
+name: IZAKHONO Production Cutover
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: the-chancellor-izakhono-production
+  cancel-in-progress: false
+
+jobs:
+  cutover:
+    name: Canary, promote and verify
+    runs-on: [self-hosted, linux, x64, izakhono]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy through owner-controlled IZAKHONO host
+        env:
+          CHANCELLOR_ENV_FILE: ${{ vars.CHANCELLOR_ENV_FILE }}
+          IZAKHONO_PUBLIC_APP_URL: ${{ vars.CHANCELLOR_PUBLIC_URL }}
+        run: sh scripts/izakhono/production-cutover.sh
