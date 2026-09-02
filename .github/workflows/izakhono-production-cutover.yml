@@ -2,6 +2,10 @@ name: IZAKHONO Production Cutover
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.izakhono/deploy-request'
 
 permissions:
   contents: read
