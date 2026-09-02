@@ -11,6 +11,8 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATA_DIR: /app/data
+      IZAKHONO_RUNTIME: "true"
+      PERSISTENT_STORAGE: "true"
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
