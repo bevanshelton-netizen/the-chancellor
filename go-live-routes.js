@@ -6,6 +6,7 @@ const {buildGrowthTiers}=require('./growth-offer-engine');
 function exists(name){try{return fs.existsSync(path.join(__dirname,name))}catch{return false}}
 function bool(value){return Boolean(value)}
 function safeHost(value=''){try{return new URL(String(value)).host}catch{return ''}}
+function truthy(value){return /^(1|true|yes|on)$/i.test(String(value||'').trim())}
 function storageCheck(){
   const dir=path.resolve(process.env.DATA_DIR||path.join(__dirname,'data'));
   try{
@@ -17,6 +18,17 @@ function storageCheck(){
   }catch(error){
     return{ok:false,path:dir,error:String(error.message||error).slice(0,180)};
   }
+}
+function runtimeInfo(){
+  const izakhono=truthy(process.env.IZAKHONO_RUNTIME)||truthy(process.env.IZAKHONO_HOST);
+  const render=String(process.env.RENDER||'').toLowerCase()==='true';
+  const vercel=String(process.env.VERCEL||'')==='1';
+  const provider=izakhono?'IZAKHONO':render?'Render':vercel?'Vercel':'unknown';
+  const branch=process.env.IZAKHONO_GIT_BRANCH||process.env.RENDER_GIT_BRANCH||process.env.VERCEL_GIT_COMMIT_REF||'';
+  const repo=process.env.IZAKHONO_GIT_REPO_SLUG||process.env.RENDER_GIT_REPO_SLUG||process.env.VERCEL_GIT_REPO_SLUG||'';
+  const commit=process.env.IZAKHONO_GIT_COMMIT||process.env.RENDER_GIT_COMMIT||process.env.VERCEL_GIT_COMMIT_SHA||'';
+  const externalUrl=process.env.IZAKHONO_PUBLIC_URL||process.env.RENDER_EXTERNAL_URL||(process.env.VERCEL_PROJECT_PRODUCTION_URL?`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`:'');
+  return{provider,branch,repo,commit,externalUrl,izakhono,render,vercel};
 }
 function check(id,label,ok,critical=true,detail=''){return{id,label,ok:Boolean(ok),critical,detail}}
 function auditModel(){
@@ -36,8 +48,9 @@ module.exports=function registerGoLiveRoutes(app){
   app.get('/api/go-live',(_req,res)=>{
     const payfastMode=String(process.env.PAYFAST_MODE||'sandbox').toLowerCase()==='live'?'live':'sandbox';
     const appUrl=String(process.env.APP_URL||'');
-    const renderUrl=String(process.env.RENDER_EXTERNAL_URL||'');
+    const runtime=runtimeInfo();
     const storage=storageCheck();
+    const persistentStorage=truthy(process.env.PERSISTENT_STORAGE)||truthy(process.env.IZAKHONO_PERSISTENT_STORAGE);
     const audit=auditModel();
     const tiers=growthTiers();
     const requiredAuditSections=['Business Foundation','Products & Services','Customers','Sales','Marketing','Finance','Compliance & Governance','Operations & Systems','Funding, Tenders & Growth'];
@@ -48,17 +61,19 @@ module.exports=function registerGoLiveRoutes(app){
     const comms=Boolean(process.env.RESEND_API_KEY)||Boolean(process.env.TWILIO_ACCOUNT_SID&&process.env.TWILIO_AUTH_TOKEN);
     const realIdentity=exists('the-chancellor.jpg')&&exists('the-chancellor-avatar.png');
     const crestReady=exists('assets/the-chancellor-crest.svg');
+    const hostMatch=!runtime.externalUrl||safeHost(appUrl)===safeHost(runtime.externalUrl);
     const checks=[
       check('runtime','Running in production mode',process.env.NODE_ENV==='production',true,process.env.NODE_ENV||'unset'),
-      check('render','Running on Render',process.env.RENDER==='true',false,process.env.RENDER==='true'?'Render runtime detected':'Runtime not identified as Render'),
-      check('branch','Render branch is main',!process.env.RENDER_GIT_BRANCH||process.env.RENDER_GIT_BRANCH==='main',true,process.env.RENDER_GIT_BRANCH||'not supplied'),
-      check('repo','Render source repo is the-chancellor',!process.env.RENDER_GIT_REPO_SLUG||/the-chancellor$/i.test(process.env.RENDER_GIT_REPO_SLUG),true,process.env.RENDER_GIT_REPO_SLUG||'not supplied'),
+      check('provider','Recognised deployment provider',runtime.provider!=='unknown',false,runtime.provider),
+      check('branch','Deployment branch is main',!runtime.branch||runtime.branch==='main',true,runtime.branch||'not supplied'),
+      check('repo','Deployment source repo is the-chancellor',!runtime.repo||/the-chancellor$/i.test(runtime.repo),true,runtime.repo||'not supplied'),
       check('entrypoint','Production entrypoint present',exists('revenue-server.js'),true,'revenue-server.js'),
       check('app-url','Secure production APP_URL',/^https:\/\//i.test(appUrl),true,safeHost(appUrl)||'unset'),
-      check('url-match','APP_URL matches Render public host',!renderUrl||safeHost(appUrl)===safeHost(renderUrl),true,renderUrl?safeHost(renderUrl):'Render URL not supplied'),
+      check('url-match','APP_URL matches public runtime host',hostMatch,true,runtime.externalUrl?safeHost(runtime.externalUrl):'runtime URL not supplied'),
       check('session','Session secret configured',String(process.env.SESSION_SECRET||'').length>=32,true,process.env.SESSION_SECRET?'configured':'missing'),
       check('admin','Admin access configured',bool(process.env.ADMIN_EMAIL&&process.env.ADMIN_PASSWORD)&&String(process.env.ADMIN_PASSWORD||'').length>=12,true,process.env.ADMIN_EMAIL&&process.env.ADMIN_PASSWORD?'configured':'missing'),
-      check('storage','Persistent data directory is writable',storage.ok,true,storage.ok?storage.path:storage.error||'not writable'),
+      check('storage','Application data directory is writable',storage.ok,true,storage.ok?storage.path:storage.error||'not writable'),
+      check('persistent-storage','Persistent production storage explicitly enabled',persistentStorage,true,persistentStorage?'declared persistent':'set PERSISTENT_STORAGE=true only on a runtime with durable /app/data'),
       check('pages','All public/private v1 pages present',pages.every(exists),true,pages.filter(x=>!exists(x)).join(', ')||'all present'),
       check('identity','Approved real Chancellor portrait and avatar present',realIdentity,true,realIdentity?'the-chancellor.jpg + the-chancellor-avatar.png':'missing approved real identity file'),
       check('brand','Chancellor crest present',crestReady,true,crestReady?'assets/the-chancellor-crest.svg':'crest missing'),
@@ -73,7 +88,6 @@ module.exports=function registerGoLiveRoutes(app){
     ];
     const blockers=checks.filter(x=>x.critical&&!x.ok);
     const warnings=checks.filter(x=>!x.critical&&!x.ok);
-    const commit=String(process.env.RENDER_GIT_COMMIT||'');
     res.setHeader('Cache-Control','no-store');
     res.json({
       ok:blockers.length===0,
@@ -81,10 +95,11 @@ module.exports=function registerGoLiveRoutes(app){
       service:"The Chancellor's Business Growth Desk",
       version:'v1-commercial',
       checkedAt:new Date().toISOString(),
-      deployment:{provider:process.env.RENDER==='true'?'Render':'unknown',repo:process.env.RENDER_GIT_REPO_SLUG||'',branch:process.env.RENDER_GIT_BRANCH||'',commit:commit||'',commitShort:commit?commit.slice(0,8):''},
+      deployment:{provider:runtime.provider,repo:runtime.repo,branch:runtime.branch,commit:runtime.commit,commitShort:runtime.commit?runtime.commit.slice(0,8):'',publicHost:safeHost(runtime.externalUrl)},
       audit:{sections:audit.sections,questions:audit.questions,maxScore:audit.maxScore},
       implementation:{tiers},
       identity:{approvedRealPortrait:exists('the-chancellor.jpg'),approvedRealAvatar:exists('the-chancellor-avatar.png'),crest:crestReady},
+      storage:{writable:storage.ok,persistentDeclared:persistentStorage,path:storage.path},
       payment:{mode:payfastMode,configured:bool(process.env.PAYFAST_MERCHANT_ID&&process.env.PAYFAST_MERCHANT_KEY),recurringReady:bool(process.env.PAYFAST_PASSPHRASE)},
       communications:{configured:comms},
       ai:{configured:bool(process.env.OPENAI_API_KEY)},
