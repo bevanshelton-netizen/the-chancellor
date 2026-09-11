@@ -1,0 +1,11 @@
+{
+  "app": "the-chancellor",
+  "gateway": "izakhono-pay",
+  "currency": "ZAR",
+  "provider": "smart",
+  "mode": "sandbox",
+  "intentApi": "/api/v1/intents",
+  "trustedServerOnly": true,
+  "browserSecretsAllowed": false,
+  "liveActivation": "blocked-until-production-payment-acceptance"
+}
