@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "appSlug": "the-chancellor",
+  "gateway": "izakhono-pay",
+  "mode": "sandbox",
+  "serverSdk": "products/izakhono-pay/sdk/server.mjs",
+  "requiredServerEnv": ["IZAKHONO_PAY_URL", "IZAKHONO_PAY_API_KEY", "IZAKHONO_PAY_APP_SLUG"],
+  "browserSecretsAllowed": false,
+  "liveActivation": "blocked-until-e2e-payment-acceptance"
+}
