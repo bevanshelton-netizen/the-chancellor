@@ -1,3 +1,5 @@
-requested_at=2026-09-02T21:33:00Z
+requested_at=2026-09-12T19:28:00Z
 requested_by=chatgpt
-reason=final-production-cutover
+reason=portfolio-port-to-izakhono
+mode=IZAKHONO_PRIMARY
+fallback_hosts=TEMPORARY_ONLY
