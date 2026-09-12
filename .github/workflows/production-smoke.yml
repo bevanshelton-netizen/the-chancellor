@@ -41,7 +41,7 @@ jobs:
           export SESSION_SECRET='ci-only-session-secret-0123456789abcdefghijklmnopqrstuvwxyz'
           export APP_URL='http://127.0.0.1:3000'
           export PAYFAST_MODE='sandbox'
-          node revenue-server.js > /tmp/chancellor-server.log 2>&1 &
+          node render-start.js > /tmp/chancellor-server.log 2>&1 &
           PID=$!
           trap 'kill "$PID" 2>/dev/null || true' EXIT
 
