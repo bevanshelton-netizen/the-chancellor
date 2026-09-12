@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "project": "the-chancellor",
+  "runtime": "docker",
+  "dockerfile": "Dockerfile",
+  "containerPort": 3000,
+  "healthPath": "/api/health",
+  "branch": "main",
+  "deploymentPolicy": {
+    "strategy": "rolling",
+    "requireHealthcheck": true,
+    "preserveExistingHost": true
+  },
+  "requiredEnvironment": [
+    "APP_URL",
+    "SESSION_SECRET",
+    "ADMIN_EMAIL",
+    "ADMIN_PASSWORD",
+    "PAYFAST_MODE",
+    "PAYFAST_MERCHANT_ID",
+    "PAYFAST_MERCHANT_KEY",
+    "PAYFAST_PASSPHRASE"
+  ],
+  "notes": "Additive IZAKHONO CLOUD migration metadata. Existing deployment remains untouched until a successful health-checked cutover."
+}
