@@ -70,6 +70,15 @@ coreApp.get('/api/features', (_req, res) => {
 function readText(name){
   try{return fs.readFileSync(path.join(__dirname,name),'utf8')}catch{return ''}
 }
+function analyticsOrigin(){
+  const raw=String(process.env.IZAKHONO_ANALYTICS_URL||'').trim();
+  if(!raw)return '';
+  try{
+    const url=new URL(raw);
+    const loopback=url.protocol==='http:'&&['127.0.0.1','localhost'].includes(url.hostname);
+    return (url.protocol==='https:'||loopback)?url.origin:'';
+  }catch{return ''}
+}
 function dataAsset(source,name){
   const re=new RegExp(`const ${name}='(data:image\\/webp;base64,[^']+)'`,'i');
   return source.match(re)?.[1]||'';
@@ -91,6 +100,10 @@ function buildHomepage(){
     html=html.replace(/src="assets\/the-chancellor-crest\.svg[^\"]*"/g,`src="${crest}"`);
   }
   if(!html.includes('concierge-client.js'))html=html.replace('</body>','<script src="/concierge-client.js?v=20260817-1"></script></body>');
+  const analytics=analyticsOrigin();
+  if(analytics&&!html.includes('beacon.js?platform=the-chancellor')){
+    html=html.replace('</head>',`<script defer src="${analytics}/beacon.js?platform=the-chancellor"></script></head>`);
+  }
   return html;
 }
 
