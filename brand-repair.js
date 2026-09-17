@@ -2,9 +2,6 @@
   const APPROVED='/assets/chancellor-approved-live.webp?v=20260813-approved-1';
   const CREST='/assets/the-chancellor-crest.svg?v=20260813-fix-1';
 
-  // Production character contract. Visual/video features should read this before
-  // selecting or generating Chancellor media. Bevan Shelton is wardrobe branding,
-  // not a replacement identity for The Chancellor.
   const CHARACTER=Object.freeze({
     id:'the-chancellor-v1',
     role:'Business Growth Desk digital adviser',
@@ -49,12 +46,30 @@
     link.dataset.rescueLayoutFix='1';
     document.head.appendChild(link);
   }
+  function mountPortfolioAd(){
+    if(document.querySelector('[data-portfolio-ad="mre"]'))return;
+    const footer=document.querySelector('footer');
+    if(!footer)return;
+    const ad=document.createElement('a');
+    ad.href='https://mandatory-regulatory-exams.vercel.app/?utm_source=the-chancellor&utm_medium=owned_promo&utm_campaign=portfolio_launch';
+    ad.target='_blank';
+    ad.rel='noopener noreferrer';
+    ad.dataset.portfolioAd='mre';
+    ad.setAttribute('aria-label','Mandatory Regulatory Exams preparation platform');
+    ad.innerHTML='<strong>WORK IN A REGULATED PROFESSION?</strong><span>Prepare for RE1, RE3, RE4, RE5 and other professional exam pathways.</span><em>Find your exam →</em>';
+    Object.assign(ad.style,{display:'flex',alignItems:'center',justifyContent:'center',gap:'14px',flexWrap:'wrap',margin:'28px auto',padding:'16px 20px',width:'min(1120px,92vw)',borderRadius:'16px',background:'linear-gradient(135deg,#071827,#0f5960)',border:'1px solid rgba(255,255,255,.18)',color:'#fff',textDecoration:'none',boxShadow:'0 14px 36px rgba(0,0,0,.2)',fontFamily:'Inter,system-ui,-apple-system,Segoe UI,sans-serif'});
+    ad.querySelector('strong').style.fontWeight='950';
+    ad.querySelector('span').style.opacity='.9';
+    ad.querySelector('em').style.cssText='font-style:normal;font-weight:950;color:#f5c95f';
+    footer.parentNode.insertBefore(ad,footer);
+  }
   function apply(){
     document.documentElement.dataset.chancellorCharacter=CHARACTER.id;
     document.querySelectorAll('.chancellor-portrait,.rescue-portrait,.avatar-img,.campaign-identity img').forEach(show);
     document.querySelectorAll('.crest-logo').forEach(repairCrest);
     loadRescueLayoutFix();
     ensurePresenceController();
+    mountPortfolioAd();
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});
