@@ -1,12 +1,34 @@
 {
-  "version": 2,
+  "version": 3,
   "name": "THE CHANCELLOR",
   "slug": "the-chancellor",
+  "operator": "IZAKHONO AFRICA (PTY) LTD",
+  "trading_name": "THE CHANCELLOR",
   "build_context": ".",
   "dockerfile_path": "Dockerfile",
   "container_port": 3000,
   "health_path": "/api/health",
   "branch": "main",
+  "infrastructure": {
+    "policy": "owned-first-externally-reversible",
+    "authoritative_source": "IZAKHONO CODE / Forge; GitHub mirror bevanshelton-netizen/the-chancellor",
+    "owned_target": "NODE01 via IZAKHONO EDGE/TLS",
+    "current_public_route": "https://the-chancellor-lj3req3r7-bevan2.vercel.app",
+    "external_fallback": "https://the-chancellor-e07wn6vc4-bevan2.vercel.app",
+    "status_label": "EXTERNAL LIVE VERIFIED",
+    "data_dependencies": [
+      "REQUIRES_CURRENT_VERIFICATION"
+    ],
+    "auth_dependencies": [
+      "REQUIRES_CURRENT_VERIFICATION"
+    ],
+    "payment_dependencies": [
+      "IZAKHONO PAY configuration requires current verification"
+    ],
+    "backup_evidence": "PENDING",
+    "restore_evidence": "PENDING",
+    "rollback_evidence": "Vercel rollback candidate available"
+  },
   "alpha": {
     "preflight": true,
     "rehearsal": false,
