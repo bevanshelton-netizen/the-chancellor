@@ -8,4 +8,4 @@ Disallow: /partner-portal.html
 Disallow: /institutional-portal.html
 Disallow: /api/
 
-Sitemap: https://the-chancellor.onrender.com/sitemap.xml
+Sitemap: https://the-chancellor.vercel.app/sitemap.xml
