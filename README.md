@@ -35,3 +35,8 @@ The definitive Chancellor portrait and avatar from the V3 archive are integrated
 - PayFast ITN signatures are checked. For high-volume production, also add PayFast source-IP and server validation according to the merchant account’s current integration guide.
 - Files are type- and size-limited. Add malware scanning and object storage for a multi-instance deployment.
 - The included JSON store is reliable for a single server. Use a managed database and shared object storage when horizontally scaling.
+
+
+## Official IZAKHONO Africa public apps
+
+Customer-facing production platforms are listed in [PUBLIC_APPS.md](./PUBLIC_APPS.md), including KORA, WorkNow, FAISReady, AUTO AI, YenzaNow, SoundLab AI, ProofForge AI, IZAKHONO Growth OS, The Chancellor and Allegro-Vibez.
