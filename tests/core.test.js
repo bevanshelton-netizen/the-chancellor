@@ -1,4 +1,5 @@
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
 const {hashSecret,verifySecret,pfEncode,payfastSignature,scoreAudit}=require('../core');
 const {scoreReadiness,publicDefinition}=require('../readiness-engine');
 const {buildQuoteSuggestion}=require('../quote-engine');
@@ -23,4 +24,17 @@ test('Rescue triage ignores browser supplied score',()=>{const t=scoreRescueTria
 test('critical enforcement flags raise Rescue urgency',()=>{const t=scoreRescueTriage({type:'legal',amount:100000,income:10000,expenses:11000,days:2,flags:['summons','repossession']});assert.equal(t.band,'Critical');assert.ok(t.score>=80)});
 test('unknown Rescue flags are discarded',()=>{const t=scoreRescueTriage({type:'tax',flags:['tax_debt','invented_flag']});assert.deepEqual(t.flags,['tax_debt'])});
 test('negative financial inputs are clamped',()=>{const t=scoreRescueTriage({type:'debt',amount:-5,income:-10,expenses:-20,days:-1});assert.equal(t.amount,0);assert.equal(t.income,0);assert.equal(t.expenses,0);assert.equal(t.days,0)});
+test('APP FABRIC client is owned-first with external resilience',()=>{
+  const client=fs.readFileSync(require.resolve('../app-fabric-client'),'utf8');
+  assert.match(client,/fabric\.izakhonoafrica\.co\.za/);
+  assert.match(client,/yfawrenhudjomhnglfhq\.supabase\.co\/functions\/v1\/izakhono-gateway-event/);
+  assert.match(client,/platform_id:'the-chancellor'/);
+  assert.match(client,/external-resilience/);
+});
+test('lead capture routes mirror to APP FABRIC',()=>{
+  const acquisition=fs.readFileSync(require.resolve('../acquisition-routes'),'utf8');
+  const crm=fs.readFileSync(require.resolve('../crm-routes'),'utf8');
+  assert.match(acquisition,/appFabric\.emitLead/);
+  assert.match(crm,/appFabric\.emitLead/);
+});
 console.log('All Chancellor core integrity tests passed.');
