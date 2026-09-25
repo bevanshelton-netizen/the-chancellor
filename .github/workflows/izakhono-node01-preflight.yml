@@ -1,0 +1,52 @@
+name: IZAKHONO NODE01 Chancellor Preflight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/izakhono-node01-preflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node01-preflight:
+    runs-on: [self-hosted, linux, x64, izakhono]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prove NODE01 foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "NODE01_PREFLIGHT_VERSION=1"
+          echo "RUNNER_NAME=$RUNNER_NAME"
+          echo "HOST=$(hostname)"
+          echo "UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          docker info >/dev/null
+          echo "DOCKER=PASS"
+          test -d /opt/izakhono && echo "IZAKHONO_ROOT=PASS" || echo "IZAKHONO_ROOT=MISSING"
+          if [ -f /opt/izakhono/apps/the-chancellor/deploy/the-chancellor.env ]; then
+            echo "CHANCELLOR_ENV=PRESENT"
+          else
+            echo "CHANCELLOR_ENV=MISSING"
+          fi
+          if docker ps --format '{{.Names}}' | grep -qx 'the-chancellor'; then
+            echo "CHANCELLOR_CONTAINER=RUNNING"
+          else
+            echo "CHANCELLOR_CONTAINER=NOT_RUNNING"
+          fi
+
+      - name: Probe local Chancellor endpoints without exposing secrets
+        shell: bash
+        run: |
+          set -u
+          for p in /api/health /api/features /api/go-live; do
+            code="$(curl -sS -o /tmp/chancellor-probe.json -w '%{http_code}' "http://127.0.0.1:3000$p" || true)"
+            echo "$p HTTP=$code"
+            if [ "$p" = "/api/go-live" ] && [ "$code" = "200" ]; then
+              node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/chancellor-probe.json','utf8'));console.log('READY_FOR_PAID_TRAFFIC='+String(Boolean(x.readyForPaidTraffic)))" || true
+            fi
+          done
