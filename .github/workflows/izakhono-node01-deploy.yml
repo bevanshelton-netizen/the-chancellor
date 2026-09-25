@@ -1,0 +1,68 @@
+name: IZAKHONO NODE01 Chancellor Deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/izakhono-node01-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-node01:
+    runs-on: [self-hosted, linux, x64, izakhono]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate owned runtime prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker info >/dev/null
+          test -d /opt/izakhono
+          test -f /opt/izakhono/apps/the-chancellor/deploy/the-chancellor.env || {
+            echo '[SAFE STOP] Host-only Chancellor env is missing.'
+            exit 2
+          }
+          grep -Eq '^PAYFAST_MODE=sandbox$' /opt/izakhono/apps/the-chancellor/deploy/the-chancellor.env || {
+            echo '[SAFE STOP] First owned deployment requires PAYFAST_MODE=sandbox.'
+            exit 3
+          }
+
+      - name: Build and start Chancellor on NODE01
+        shell: bash
+        run: |
+          set -euo pipefail
+          ln -s /opt/izakhono/apps/the-chancellor/deploy/the-chancellor.env deploy/the-chancellor.env
+          trap 'rm -f deploy/the-chancellor.env' EXIT
+          docker compose -f deploy/izakhono-compose.yml --env-file /opt/izakhono/apps/the-chancellor/deploy/the-chancellor.env up -d --build
+
+      - name: Verify health and readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          ok=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/api/health >/tmp/chancellor-health.json; then ok=1; break; fi
+            sleep 2
+          done
+          test "$ok" = 1
+          curl -fsS http://127.0.0.1:3000/api/features >/tmp/chancellor-features.json
+          curl -fsS http://127.0.0.1:3000/api/go-live >/tmp/chancellor-ready.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync('/tmp/chancellor-ready.json','utf8'));
+          console.log('READY_FOR_PAID_TRAFFIC='+String(Boolean(x.readyForPaidTraffic)));
+NODE
+
+      - name: Preserve hybrid safety boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'NODE01_RUNTIME=HEALTHY'
+          echo 'PUBLIC_DNS_CUTOVER=NOT_PERFORMED'
+          echo 'EXTERNAL_FALLBACK=RETAINED'
+          echo 'PAYFAST_LIVE_SWITCH=NOT_PERFORMED'
