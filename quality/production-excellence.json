@@ -1,0 +1,50 @@
+{
+  "schema": "izakhono.production-excellence/v1",
+  "product": "The Chancellor",
+  "profile": "izakhono-premium-v1",
+  "budgets": {
+    "htmlBytes": 524288
+  },
+  "profileMarkers": [
+    {
+      "file": "index.html",
+      "contains": "izakhono-premium-v1"
+    }
+  ],
+  "premiumCssFiles": [
+    "premium-v1.css"
+  ],
+  "responsiveFiles": [
+    "styles.css",
+    "portrait.css",
+    "homepage-tweaks.css",
+    "launch-polish.css"
+  ],
+  "htmlFiles": [
+    "index.html"
+  ],
+  "securityAssertions": [
+    {
+      "file": "server.js",
+      "needles": [
+        "helmet",
+        "contentSecurityPolicy"
+      ]
+    },
+    {
+      "file": "revenue-server.js",
+      "needles": [
+        "helmet",
+        "Permissions-Policy"
+      ]
+    }
+  ],
+  "sourceAssertions": [
+    {
+      "file": "index.html",
+      "needles": [
+        "R500 Business Readiness Audit"
+      ]
+    }
+  ]
+}

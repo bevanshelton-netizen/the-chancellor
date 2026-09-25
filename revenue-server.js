@@ -5,6 +5,7 @@ for (const key of ['PAYFAST_MODE','PAYFAST_MERCHANT_ID','PAYFAST_MERCHANT_KEY','
 const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
+const helmet = require('helmet');
 const coreApp = require('./server');
 
 const featureState = {};
@@ -108,6 +109,11 @@ function buildHomepage(){
 }
 
 const app=express();
+app.use(helmet({contentSecurityPolicy:false,crossOriginEmbedderPolicy:false}));
+app.use((_req,res,next)=>{
+  res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');
+  next();
+});
 app.get('/',(_req,res)=>{
   const html=buildHomepage();
   if(!html)return res.status(500).type('text/plain').send('Homepage unavailable.');
