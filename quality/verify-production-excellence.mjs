@@ -42,8 +42,12 @@ for(const path of cfg.htmlFiles||[]){
   if(missingAlt(markup).length)fail(path+" image missing alt");
   const base=dirname(path);
   for(const ref of refs(html)){
-    const target=ref.startsWith("/")?resolve(ROOT,ref.slice(1)):resolve(ROOT,base,ref);
-    try{await access(target)}catch{fail(path+" broken local asset "+ref)}
+    const candidates=ref.startsWith("/")
+      ? [resolve(ROOT,ref.slice(1)),resolve(ROOT,"public",ref.slice(1))]
+      : [resolve(ROOT,base,ref)];
+    let found=false;
+    for(const target of candidates){try{await access(target);found=true;break}catch{}}
+    if(!found) fail(path+" broken local asset "+ref);
   }
 }
 for(const assertion of cfg.securityAssertions||[]){
