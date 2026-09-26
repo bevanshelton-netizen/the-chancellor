@@ -55,7 +55,8 @@ module.exports=function registerGoLiveRoutes(app){
     const appUrl=String(process.env.APP_URL||'');
     const runtime=runtimeInfo();
     const storage=storageCheck();
-    const persistentStorage=(truthy(process.env.PERSISTENT_STORAGE)||truthy(process.env.IZAKHONO_PERSISTENT_STORAGE))&&!truthy(process.env.DATA_DIR_FALLBACK_ACTIVE);
+    const persistenceProven=truthy(process.env.IZAKHONO_PERSISTENT_STORAGE_PROVEN);
+    const persistentStorage=(persistenceProven||truthy(process.env.PERSISTENT_STORAGE)||truthy(process.env.IZAKHONO_PERSISTENT_STORAGE))&&!truthy(process.env.DATA_DIR_FALLBACK_ACTIVE);
     const audit=auditModel();
     const tiers=growthTiers();
     const requiredAuditSections=['Business Foundation','Products & Services','Customers','Sales','Marketing','Finance','Compliance & Governance','Operations & Systems','Funding, Tenders & Growth'];
@@ -104,7 +105,7 @@ module.exports=function registerGoLiveRoutes(app){
       audit:{sections:audit.sections,questions:audit.questions,maxScore:audit.maxScore},
       implementation:{tiers},
       identity:{approvedRealPortrait:exists('the-chancellor.jpg'),approvedRealAvatar:exists('the-chancellor-avatar.png'),crest:crestReady},
-      storage:{writable:storage.ok,persistentDeclared:persistentStorage,path:storage.path},
+      storage:{writable:storage.ok,persistentDeclared:persistentStorage,persistenceProven,persistenceBootCount:Number(process.env.IZAKHONO_STORAGE_BOOT_COUNT||0),fallbackActive:truthy(process.env.DATA_DIR_FALLBACK_ACTIVE),path:storage.path},
       payment:{mode:payfastMode,configured:bool(process.env.PAYFAST_MERCHANT_ID&&process.env.PAYFAST_MERCHANT_KEY),recurringReady:bool(process.env.PAYFAST_PASSPHRASE)},
       communications:{configured:comms},
       ai:{configured:bool(process.env.OPENAI_API_KEY)},
