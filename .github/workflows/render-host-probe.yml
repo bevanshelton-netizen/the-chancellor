@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/render-host-probe.yml'
+      - 'deploy/runtime-release-marker.json'
       - 'render.yaml'
       - 'Dockerfile'
       - 'render-start.js'
@@ -21,35 +22,41 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 6
     steps:
-      - name: Wait for external backend health
+      - name: Wait for exact external backend release
         shell: bash
+        env:
+          EXPECTED_RELEASE: ${{ github.sha }}
         run: |
           set -u
           BASE='https://the-chancellor.onrender.com'
           HEALTH="$BASE/api/health"
           READY="$BASE/api/go-live"
 
-          for attempt in $(seq 1 18); do
+          for attempt in $(seq 1 24); do
             hcode=$(curl -L --connect-timeout 8 --max-time 15 -sS -o /tmp/health.json -w '%{http_code}' "$HEALTH" || true)
             echo "attempt=$attempt health_http=$hcode"
             if [ "$hcode" = '200' ]; then
-              cat /tmp/health.json
-              echo
-              node -e "const x=require('/tmp/health.json'); console.log('product='+String(x.product||'')); console.log('release_id='+String(x.release?.id||'')); console.log('runtime_class='+String(x.release?.runtimeClass||''));"
+              release=$(node -e "const x=require('/tmp/health.json'); process.stdout.write(String(x.release?.id||''))" 2>/dev/null || true)
+              echo "observed_release=$release"
+              echo "expected_release=$EXPECTED_RELEASE"
+              if [ "$release" != "$EXPECTED_RELEASE" ]; then
+                sleep 10
+                continue
+              fi
+
+              node -e "const x=require('/tmp/health.json'); console.log('product='+String(x.product||'')); console.log('release_id='+String(x.release?.id||'')); console.log('runtime_class='+String(x.release?.runtimeClass||'')); console.log('storage_path='+String(x.storage?.path||'')); console.log('storage_fallback='+String(Boolean(x.storage?.fallbackActive))); console.log('persistence_boot_count='+String(Number(x.storage?.persistenceBootCount||0))); console.log('persistence_proven='+String(Boolean(x.storage?.persistenceProven)));"
+
               gcode=$(curl -L --connect-timeout 8 --max-time 15 -sS -o /tmp/go-live.json -w '%{http_code}' "$READY" || true)
               echo "go_live_http=$gcode"
               if [ "$gcode" = '200' ]; then
-                node -e "const x=require('/tmp/go-live.json'); console.log('readyForPaidTraffic='+String(Boolean(x.readyForPaidTraffic))); console.log('blockers='+(x.blockers||[]).join(','));"
+                node -e "const x=require('/tmp/go-live.json'); console.log('readyForPaidTraffic='+String(Boolean(x.readyForPaidTraffic))); console.log('blockers='+(x.blockers||[]).join(',')); console.log('warnings='+(x.warnings||[]).join(',')); console.log('payment_mode='+String(x.payment?.mode||'')); console.log('payment_configured='+String(Boolean(x.payment?.configured))); console.log('recurring_ready='+String(Boolean(x.payment?.recurringReady))); console.log('storage='+JSON.stringify(x.storage||{}));"
               fi
               exit 0
             fi
             sleep 10
           done
 
-          echo "External backend did not become healthy during the probe window."
-          echo "Final health response:"
-          head -c 500 /tmp/health.json 2>/dev/null || true
-          echo
+          echo "External backend did not serve the expected release during the probe window."
           exit 1
