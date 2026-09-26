@@ -36,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ln -s /opt/izakhono/apps/the-chancellor/deploy/the-chancellor.env deploy/the-chancellor.env
+          ln -sf /opt/izakhono/apps/the-chancellor/deploy/the-chancellor.env deploy/the-chancellor.env
           trap 'rm -f deploy/the-chancellor.env' EXIT
           docker compose -f deploy/izakhono-compose.yml --env-file /opt/izakhono/apps/the-chancellor/deploy/the-chancellor.env up -d --build
 
@@ -46,17 +46,16 @@ jobs:
           set -euo pipefail
           ok=0
           for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3000/api/health >/tmp/chancellor-health.json; then ok=1; break; fi
+            if curl -fsS http://127.0.0.1:3000/api/health >/tmp/chancellor-health.json; then
+              ok=1
+              break
+            fi
             sleep 2
           done
           test "$ok" = 1
           curl -fsS http://127.0.0.1:3000/api/features >/tmp/chancellor-features.json
           curl -fsS http://127.0.0.1:3000/api/go-live >/tmp/chancellor-ready.json
-          node - <<'NODE'
-          const fs=require('fs');
-          const x=JSON.parse(fs.readFileSync('/tmp/chancellor-ready.json','utf8'));
-          console.log('READY_FOR_PAID_TRAFFIC='+String(Boolean(x.readyForPaidTraffic)));
-NODE
+          node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/chancellor-ready.json','utf8'));console.log('READY_FOR_PAID_TRAFFIC='+String(Boolean(x.readyForPaidTraffic)))"
 
       - name: Preserve hybrid safety boundary
         shell: bash
