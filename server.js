@@ -98,6 +98,12 @@ app.get('/api/health', (_, res) => {
       runtimeClass,
       dataSchema: String(process.env.IZAKHONO_DATA_SCHEMA_VERSION || '1'),
       owned: /^owned(?:-|$)/.test(runtimeClass)
+    },
+    storage: {
+      path: String(process.env.DATA_DIR || ''),
+      fallbackActive: String(process.env.DATA_DIR_FALLBACK_ACTIVE || '').toLowerCase() === 'true',
+      persistenceBootCount: Number(process.env.IZAKHONO_STORAGE_BOOT_COUNT || 0),
+      persistenceProven: String(process.env.IZAKHONO_PERSISTENT_STORAGE_PROVEN || '').toLowerCase() === 'true'
     }
   });
 });
