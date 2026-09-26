@@ -1,0 +1,56 @@
+{
+  "schema": "izakhono.runtime-fabric.v1",
+  "product": "the-chancellor",
+  "service": "The Chancellor's Business Growth Desk",
+  "entrypoint": "revenue-server.js",
+  "container": {
+    "port": 3000,
+    "health_path": "/api/health",
+    "readiness_path": "/api/go-live",
+    "data_path": "/app/data"
+  },
+  "release_identity": {
+    "version_env": "IZAKHONO_RELEASE_VERSION",
+    "release_id_env": "IZAKHONO_RELEASE_ID",
+    "runtime_id_env": "IZAKHONO_RUNTIME_ID",
+    "runtime_class_env": "IZAKHONO_RUNTIME_CLASS",
+    "schema_version_env": "IZAKHONO_DATA_SCHEMA_VERSION"
+  },
+  "routing": {
+    "preference": [
+      "owned-healthy",
+      "owned-secondary-healthy",
+      "external-resilience-healthy"
+    ],
+    "fail_closed_when_no_healthy_target": true,
+    "node01_is_required": false
+  },
+  "state": {
+    "persistent": true,
+    "single_authoritative_writer_required": true,
+    "multiwriter_requires_tested_replication": true,
+    "local_disk_is_not_portfolio_source_of_truth": true
+  },
+  "targets": {
+    "owned_runtime": {
+      "class": "owned",
+      "approved": true
+    },
+    "owned_cluster": {
+      "class": "owned-cluster",
+      "approved_when_verified": true
+    },
+    "external_resilience": {
+      "class": "external-resilience",
+      "approved_when_full_backend_health_passes": true
+    },
+    "external_static_fallback": {
+      "class": "external-static",
+      "backend_capable": false,
+      "url": "https://the-chancellor.vercel.app/"
+    }
+  },
+  "secrets": {
+    "outside_release_artifact": true
+  }
+}
