@@ -6,6 +6,14 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/render-host-probe.yml'
+      - 'render.yaml'
+      - 'Dockerfile'
+      - 'render-start.js'
+      - 'server.js'
+      - 'revenue-server.js'
+      - 'go-live-routes.js'
+      - 'package.json'
+      - 'package-lock.json'
 
 permissions:
   contents: read
@@ -13,26 +21,35 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
-      - name: Probe known Render hostnames
+      - name: Wait for external backend health
         shell: bash
         run: |
           set -u
-          for base in \
-            'https://the-chancellor.onrender.com' \
-            'https://the-chancellors-business-growth-desk.onrender.com'
-          do
-            echo "===== $base ====="
-            code=$(curl -L --connect-timeout 10 --max-time 20 -sS -o /tmp/home.html -w '%{http_code}' "$base/" || true)
-            echo "home_http=$code"
-            if [ -s /tmp/home.html ]; then
-              grep -o -m1 '<title>[^<]*</title>' /tmp/home.html || true
-              if grep -Fq 'Start the R500 Business Readiness Audit' /tmp/home.html; then echo 'r500_first=yes'; else echo 'r500_first=no'; fi
-              if grep -Fq '/assets/chancellor-approved-live.webp' /tmp/home.html; then echo 'approved_portrait_ref=yes'; else echo 'approved_portrait_ref=no'; fi
+          BASE='https://the-chancellor.onrender.com'
+          HEALTH="$BASE/api/health"
+          READY="$BASE/api/go-live"
+
+          for attempt in $(seq 1 18); do
+            hcode=$(curl -L --connect-timeout 8 --max-time 15 -sS -o /tmp/health.json -w '%{http_code}' "$HEALTH" || true)
+            echo "attempt=$attempt health_http=$hcode"
+            if [ "$hcode" = '200' ]; then
+              cat /tmp/health.json
+              echo
+              node -e "const x=require('/tmp/health.json'); console.log('product='+String(x.product||'')); console.log('release_id='+String(x.release?.id||'')); console.log('runtime_class='+String(x.release?.runtimeClass||''));"
+              gcode=$(curl -L --connect-timeout 8 --max-time 15 -sS -o /tmp/go-live.json -w '%{http_code}' "$READY" || true)
+              echo "go_live_http=$gcode"
+              if [ "$gcode" = '200' ]; then
+                node -e "const x=require('/tmp/go-live.json'); console.log('readyForPaidTraffic='+String(Boolean(x.readyForPaidTraffic))); console.log('blockers='+(x.blockers||[]).join(','));"
+              fi
+              exit 0
             fi
-            hcode=$(curl -L --connect-timeout 10 --max-time 20 -sS -o /tmp/health.json -w '%{http_code}' "$base/api/health" || true)
-            echo "health_http=$hcode"
-            cat /tmp/health.json 2>/dev/null || true
-            echo
+            sleep 10
           done
+
+          echo "External backend did not become healthy during the probe window."
+          echo "Final health response:"
+          head -c 500 /tmp/health.json 2>/dev/null || true
+          echo
+          exit 1
