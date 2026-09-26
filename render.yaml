@@ -6,7 +6,7 @@ services:
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/health
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: commit
     buildFilter:
       ignoredPaths:
         - .github/**
@@ -22,6 +22,16 @@ services:
         value: production
       - key: DATA_DIR
         value: /app/data
+      - key: PERSISTENT_STORAGE
+        value: "true"
+      - key: IZAKHONO_RUNTIME_CLASS
+        value: external-resilience
+      - key: IZAKHONO_RUNTIME_ID
+        value: render-the-chancellor
+      - key: IZAKHONO_RELEASE_VERSION
+        value: v1-commercial
+      - key: IZAKHONO_DATA_SCHEMA_VERSION
+        value: "1"
       - key: SESSION_SECRET
         generateValue: true
       - key: APP_URL
