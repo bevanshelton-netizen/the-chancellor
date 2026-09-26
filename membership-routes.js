@@ -11,7 +11,7 @@ const pfParamString=fields=>Object.entries(fields).filter(([k,v])=>k!=='signatur
 const mode=()=>String(process.env.PAYFAST_MODE||'sandbox').toLowerCase()==='live'?'live':'sandbox';
 const configured=()=>Boolean(process.env.PAYFAST_MERCHANT_ID&&process.env.PAYFAST_MERCHANT_KEY&&process.env.PAYFAST_PASSPHRASE);
 function addMonth(iso){const d=iso?new Date(iso):new Date();d.setMonth(d.getMonth()+1);return d.toISOString();}
-function subscriptionCurrent(p){if(p.subscriptionOverride===true)return true;if(String(p.subscriptionStatus||'')!=='Active')return false;if(!p.subscriptionRenewsAt)return true;const t=new Date(p.subscriptionRenewsAt).getTime();return Number.isFinite(t)&&t>=Date.now();}
+function subscriptionCurrent(p){if(p.subscriptionOverride===true)return true;if(String(p.subscriptionStatus||'')!=='Active')return false;if(!p.subscriptionRenewsAt)return false;const t=new Date(p.subscriptionRenewsAt).getTime();return Number.isFinite(t)&&t>=Date.now();}
 
 module.exports = function registerMembershipRoutes(app){
   const requireProfessional=(req,res,next)=>req.session?.professionalId?next():res.status(401).json({error:'Professional Network sign-in required.'});
