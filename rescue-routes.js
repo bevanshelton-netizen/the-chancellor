@@ -12,7 +12,7 @@ module.exports = function registerRescueRoutes(app, { store, normalise, hashSecr
   const subscriptionCurrent = p => {
     if (p.subscriptionOverride === true) return true;
     if (String(p.subscriptionStatus || '').toLowerCase() !== 'active') return false;
-    if (!p.subscriptionRenewsAt) return true;
+    if (!p.subscriptionRenewsAt) return false;
     const renews = new Date(p.subscriptionRenewsAt).getTime();
     return Number.isFinite(renews) && renews >= Date.now();
   };
