@@ -55,7 +55,7 @@ module.exports=function registerGoLiveRoutes(app){
     const appUrl=String(process.env.APP_URL||'');
     const runtime=runtimeInfo();
     const storage=storageCheck();
-    const persistentStorage=truthy(process.env.PERSISTENT_STORAGE)||truthy(process.env.IZAKHONO_PERSISTENT_STORAGE);
+    const persistentStorage=(truthy(process.env.PERSISTENT_STORAGE)||truthy(process.env.IZAKHONO_PERSISTENT_STORAGE))&&!truthy(process.env.DATA_DIR_FALLBACK_ACTIVE);
     const audit=auditModel();
     const tiers=growthTiers();
     const requiredAuditSections=['Business Foundation','Products & Services','Customers','Sales','Marketing','Finance','Compliance & Governance','Operations & Systems','Funding, Tenders & Growth'];
@@ -78,7 +78,7 @@ module.exports=function registerGoLiveRoutes(app){
       check('session','Session secret configured',String(process.env.SESSION_SECRET||'').length>=32,true,process.env.SESSION_SECRET?'configured':'missing'),
       check('admin','Admin access configured',bool(process.env.ADMIN_EMAIL&&process.env.ADMIN_PASSWORD)&&String(process.env.ADMIN_PASSWORD||'').length>=12,true,process.env.ADMIN_EMAIL&&process.env.ADMIN_PASSWORD?'configured':'missing'),
       check('storage','Application data directory is writable',storage.ok,true,storage.ok?storage.path:storage.error||'not writable'),
-      check('persistent-storage','Persistent production storage explicitly enabled',persistentStorage,true,persistentStorage?'declared persistent':'set PERSISTENT_STORAGE=true only on a runtime with durable /app/data'),
+      check('persistent-storage','Persistent production storage explicitly enabled',persistentStorage,true,persistentStorage?'declared persistent and active':truthy(process.env.DATA_DIR_FALLBACK_ACTIVE)?'temporary DATA_DIR fallback is active':'set PERSISTENT_STORAGE=true only on a runtime with durable /app/data'),
       check('pages','All public/private v1 pages present',pages.every(exists),true,pages.filter(x=>!exists(x)).join(', ')||'all present'),
       check('identity','Approved real Chancellor portrait and avatar present',realIdentity,true,realIdentity?'the-chancellor.jpg + the-chancellor-avatar.png':'missing approved real identity file'),
       check('brand','Chancellor crest present',crestReady,true,crestReady?'assets/the-chancellor-crest.svg':'crest missing'),
