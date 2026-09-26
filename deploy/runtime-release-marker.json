@@ -1,0 +1,6 @@
+{
+  "schema": "izakhono.runtime-fabric.release-marker.v1",
+  "purpose": "prove external persistence across deploys",
+  "sequence": 1,
+  "approved_for": "external-resilience-diagnostic"
+}
