@@ -81,7 +81,26 @@ const upload = multer({ storage: multer.diskStorage({ destination: uploadsDir, f
 
 require('./rescue-routes')(app, { store, normalise, hashSecret, verifySecret, accessCode });
 
-app.get('/api/health', (_, res) => res.json({ ok: true, service: "The Chancellor's Business Growth Desk", paymentMode, node:process.version }));
+app.get('/api/health', (_, res) => {
+  const runtimeClass = String(process.env.IZAKHONO_RUNTIME_CLASS || (process.env.IZAKHONO_RUNTIME === 'true' ? 'owned' : 'unknown')).trim();
+  const releaseId = String(process.env.IZAKHONO_RELEASE_ID || process.env.IZAKHONO_GIT_COMMIT || process.env.RENDER_GIT_COMMIT || process.env.VERCEL_GIT_COMMIT_SHA || 'unknown').trim();
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({
+    ok: true,
+    service: "The Chancellor's Business Growth Desk",
+    product: 'the-chancellor',
+    paymentMode,
+    node: process.version,
+    release: {
+      version: String(process.env.IZAKHONO_RELEASE_VERSION || 'v1-commercial'),
+      id: releaseId,
+      runtimeId: String(process.env.IZAKHONO_RUNTIME_ID || process.env.HOSTNAME || 'unknown'),
+      runtimeClass,
+      dataSchema: String(process.env.IZAKHONO_DATA_SCHEMA_VERSION || '1'),
+      owned: /^owned(?:-|$)/.test(runtimeClass)
+    }
+  });
+});
 app.get('/api/status', (_, res) => res.json({ liveAI: Boolean(process.env.OPENAI_API_KEY), voice: Boolean(process.env.OPENAI_API_KEY), admin: Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD), payments: paymentConfigured, paymentMode }));
 
 app.post('/api/speech', async (req, res) => {
