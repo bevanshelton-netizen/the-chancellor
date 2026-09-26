@@ -28,7 +28,12 @@ function runtimeInfo(){
   const repo=process.env.IZAKHONO_GIT_REPO_SLUG||process.env.RENDER_GIT_REPO_SLUG||process.env.VERCEL_GIT_REPO_SLUG||'';
   const commit=process.env.IZAKHONO_GIT_COMMIT||process.env.RENDER_GIT_COMMIT||process.env.VERCEL_GIT_COMMIT_SHA||'';
   const externalUrl=process.env.IZAKHONO_PUBLIC_URL||process.env.RENDER_EXTERNAL_URL||(process.env.VERCEL_PROJECT_PRODUCTION_URL?`https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`:'');
-  return{provider,branch,repo,commit,externalUrl,izakhono,render,vercel};
+  const runtimeClass=String(process.env.IZAKHONO_RUNTIME_CLASS||(izakhono?'owned':render||vercel?'external-resilience':'unknown')).trim();
+  const runtimeId=String(process.env.IZAKHONO_RUNTIME_ID||process.env.HOSTNAME||'unknown').trim();
+  const releaseId=String(process.env.IZAKHONO_RELEASE_ID||commit||'unknown').trim();
+  const releaseVersion=String(process.env.IZAKHONO_RELEASE_VERSION||'v1-commercial').trim();
+  const dataSchema=String(process.env.IZAKHONO_DATA_SCHEMA_VERSION||'1').trim();
+  return{provider,branch,repo,commit,externalUrl,izakhono,render,vercel,runtimeClass,runtimeId,releaseId,releaseVersion,dataSchema};
 }
 function check(id,label,ok,critical=true,detail=''){return{id,label,ok:Boolean(ok),critical,detail}}
 function auditModel(){
@@ -95,7 +100,7 @@ module.exports=function registerGoLiveRoutes(app){
       service:"The Chancellor's Business Growth Desk",
       version:'v1-commercial',
       checkedAt:new Date().toISOString(),
-      deployment:{provider:runtime.provider,repo:runtime.repo,branch:runtime.branch,commit:runtime.commit,commitShort:runtime.commit?runtime.commit.slice(0,8):'',publicHost:safeHost(runtime.externalUrl)},
+      deployment:{provider:runtime.provider,repo:runtime.repo,branch:runtime.branch,commit:runtime.commit,commitShort:runtime.commit?runtime.commit.slice(0,8):'',publicHost:safeHost(runtime.externalUrl),runtimeClass:runtime.runtimeClass,runtimeId:runtime.runtimeId,releaseId:runtime.releaseId,releaseVersion:runtime.releaseVersion,dataSchema:runtime.dataSchema},
       audit:{sections:audit.sections,questions:audit.questions,maxScore:audit.maxScore},
       implementation:{tiers},
       identity:{approvedRealPortrait:exists('the-chancellor.jpg'),approvedRealAvatar:exists('the-chancellor-avatar.png'),crest:crestReady},
