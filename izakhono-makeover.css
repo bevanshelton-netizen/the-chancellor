@@ -1,0 +1,47 @@
+/* The Chancellor — International Makeover v1 */
+:root{--chancellor-shell:1180px;--chancellor-radius:24px;--chancellor-shadow:0 28px 90px rgba(0,0,0,.32)}
+html{scroll-behavior:smooth}
+body{font-size:16px;line-height:1.65}
+.topbar{height:86px;padding-inline:max(22px,calc((100vw - var(--chancellor-shell))/2));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.topbar nav{gap:24px}
+.topbar nav a{position:relative}
+.topbar nav a:after{content:"";position:absolute;left:0;right:100%;bottom:-8px;height:1px;background:var(--gold);transition:right .18s ease}
+.topbar nav a:hover:after{right:0}
+.button{border-radius:999px;min-height:48px;padding:0 20px;transition:transform .18s ease,box-shadow .18s ease}
+.button:hover{transform:translateY(-2px)}
+a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--gold2);outline-offset:3px}
+.hero{min-height:760px;padding:86px max(24px,calc((100vw - var(--chancellor-shell))/2)) 0;gap:58px;background:radial-gradient(circle at 82% 42%,#3b2e1a 0,transparent 32%),linear-gradient(180deg,#090806,#0c0a07)}
+.hero h1{font-size:clamp(3.7rem,7vw,7rem);line-height:.9;letter-spacing:-.06em;text-wrap:balance;max-width:920px}
+.lead{font-size:clamp(1.05rem,1.6vw,1.25rem);line-height:1.75;max-width:760px}
+.trust{gap:12px 18px;flex-wrap:wrap;margin-top:20px}
+.trust span{border:1px solid #3c3325;border-radius:999px;padding:8px 11px;background:#ffffff06}
+.portrait-stage{height:650px}
+.portrait-card{border-radius:14px;backdrop-filter:blur(12px)}
+.audit-strip{padding-inline:max(24px,calc((100vw - var(--chancellor-shell))/2));gap:34px}
+.section,.adviser,.audit,.portal-cta{padding-left:max(24px,calc((100vw - var(--chancellor-shell))/2));padding-right:max(24px,calc((100vw - var(--chancellor-shell))/2))}
+.section h2,.adviser h2,.portal-cta h2{font-size:clamp(2.6rem,5vw,5rem);line-height:.98;letter-spacing:-.045em;text-wrap:balance}
+.cards{gap:14px;background:transparent}
+.cards article{border:1px solid var(--line);border-radius:var(--chancellor-radius);min-height:285px;box-shadow:0 16px 52px rgba(0,0,0,.16)}
+.chat-shell,.audit-form,.portal-cta{border-radius:var(--chancellor-radius)}
+.chat-shell{overflow:hidden;box-shadow:var(--chancellor-shadow)}
+.audit-form{box-shadow:0 24px 70px rgba(0,0,0,.18)}
+.portal-cta{margin:0;border-top:1px solid #3a3022}
+footer{padding-left:max(24px,calc((100vw - var(--chancellor-shell))/2));padding-right:max(24px,calc((100vw - var(--chancellor-shell))/2))}
+@media(max-width:900px){
+  .hero{min-height:auto;padding-top:58px}
+  .hero h1{font-size:clamp(3.2rem,12vw,5.3rem)}
+  .portrait-stage{height:520px}
+  .audit-strip{grid-template-columns:1fr 1fr}
+  .cards{grid-template-columns:1fr 1fr}
+}
+@media(max-width:600px){
+  .topbar{height:72px;padding-inline:14px}
+  .hero{padding-inline:16px}
+  .portrait-stage{height:420px}
+  .section,.adviser,.audit,.portal-cta{padding-left:16px;padding-right:16px}
+  .cards,.audit-strip{grid-template-columns:1fr}
+  .trust{gap:8px}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+}
