@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://izakhono.africa/schemas/node01-runtime-binding.schema.json",
   "title": "IZAKHONO NODE01 Runtime Binding",
-  "description": "NODE01 is software. This schema binds its stable software identity to a separate execution environment.",
+  "description": "NODE01 is software; this binds its stable software identity to a separate execution environment.",
   "type": "object",
   "required": [
     "schema",
@@ -31,7 +31,7 @@
           "APPROVED_RUNTIME_HOST"
         ]
       },
-      "description": "Locator of a separately managed execution environment, not the NODE01 identity."
+      "description": "Locator of a separately managed execution environment, not NODE01 identity."
     },
     "runtime_host_is_separate": {
       "const": true
